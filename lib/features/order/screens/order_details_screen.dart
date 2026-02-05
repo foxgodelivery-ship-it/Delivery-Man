@@ -172,6 +172,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
 
               showDeliveryConfirmImage = pickedUp && Get.find<SplashController>().configModel!.dmPictureUploadStatus! && controllerOrderModel.orderStatus != 'delivered';
             }
+            final bool hasPickedUp = controllerOrderModel?.orderStatus == 'picked_up';
+            final bool canChatCustomer = showChatPermission && hasPickedUp && controllerOrderModel?.customer != null;
 
             return (orderController.orderDetailsModel != null && controllerOrderModel != null) ? Column(children: [
 
@@ -293,13 +295,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                     title: parcel ? 'sender_details'.tr : 'store_details'.tr,
                     address: parcel ? controllerOrderModel.deliveryAddress : DeliveryAddress(address: controllerOrderModel.storeAddress),
                     image: parcel ? '' : '${controllerOrderModel.storeLogoFullUrl}',
-                    name: parcel ? controllerOrderModel.deliveryAddress!.contactPersonName : controllerOrderModel.storeName,
-                    phone: parcel ? controllerOrderModel.deliveryAddress!.contactPersonNumber : controllerOrderModel.storePhone,
+                    name: parcel
+                        ? (hasPickedUp ? controllerOrderModel.deliveryAddress!.contactPersonName : 'Remetente')
+                        : controllerOrderModel.storeName,
+                    phone: parcel ? null : controllerOrderModel.storePhone,
                     latitude: parcel ? controllerOrderModel.deliveryAddress!.latitude : controllerOrderModel.storeLat,
                     longitude: parcel ? controllerOrderModel.deliveryAddress!.longitude : controllerOrderModel.storeLng,
                     showButton: (controllerOrderModel.orderStatus != 'delivered' && controllerOrderModel.orderStatus != 'failed'
                         && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded'),
                     isStore: parcel ? false : true, isChatAllow: showChatPermission,
+                    showCallButton: !parcel,
                     messageOnTap: () => Get.toNamed(RouteHelper.getChatRoute(
                       notificationBody: NotificationBodyModel(
                         orderId: controllerOrderModel.id, vendorId: orderController.orderDetailsModel![0].vendorId,
@@ -317,22 +322,27 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                     title: parcel ? 'receiver_details'.tr : 'customer_contact_details'.tr,
                     address: parcel ? controllerOrderModel.receiverDetails : controllerOrderModel.deliveryAddress,
                     image: parcel ? '' : controllerOrderModel.customer != null ? '${controllerOrderModel.customer!.imageFullUrl}' : '',
-                    name: parcel ? controllerOrderModel.receiverDetails!.contactPersonName : controllerOrderModel.deliveryAddress!.contactPersonName,
-                    phone: parcel ? controllerOrderModel.receiverDetails!.contactPersonNumber : controllerOrderModel.deliveryAddress!.contactPersonNumber,
+                    name: hasPickedUp
+                        ? parcel ? controllerOrderModel.receiverDetails!.contactPersonName : controllerOrderModel.deliveryAddress!.contactPersonName
+                        : 'Destinatário',
+                    phone: null,
                     latitude: parcel ? controllerOrderModel.receiverDetails!.latitude : controllerOrderModel.deliveryAddress!.latitude,
                     longitude: parcel ? controllerOrderModel.receiverDetails!.longitude : controllerOrderModel.deliveryAddress!.longitude,
                     showButton: controllerOrderModel.orderStatus != 'delivered' && controllerOrderModel.orderStatus != 'failed'
                         && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded',
-                    isStore: parcel ? false : true, isChatAllow: showChatPermission,
-                    messageOnTap: () => Get.toNamed(RouteHelper.getChatRoute(
+                    isStore: parcel ? false : true, isChatAllow: canChatCustomer,
+                    showCallButton: false,
+                    messageOnTap: canChatCustomer ? () => Get.toNamed(RouteHelper.getChatRoute(
                       notificationBody: NotificationBodyModel(
                         orderId: controllerOrderModel.id, customerId: controllerOrderModel.customer!.id,
                       ),
                       user: User(
-                        id: controllerOrderModel.customer!.id, fName: controllerOrderModel.customer!.fName,
-                        lName: controllerOrderModel.customer!.lName, imageFullUrl: controllerOrderModel.customer!.imageFullUrl,
+                        id: controllerOrderModel.customer!.id,
+                        fName: controllerOrderModel.customer!.fName,
+                        lName: controllerOrderModel.customer!.lName,
+                        imageFullUrl: controllerOrderModel.customer!.imageFullUrl,
                       ),
-                    )),
+                    )) : null,
                     order: order,
                   ),
                   const SizedBox(height: Dimensions.paddingSizeLarge),

@@ -20,8 +20,10 @@ class InfoCardWidget extends StatelessWidget {
   final Function? messageOnTap;
   final OrderModel order;
   final bool isChatAllow;
+  final bool showCallButton;
   const InfoCardWidget({super.key, required this.title, required this.image, required this.name, required this.address, required this.phone,
-    required this.latitude, required this.longitude, required this.showButton, this.messageOnTap, this.isStore = false, required this.order, required this.isChatAllow});
+    required this.latitude, required this.longitude, required this.showButton, this.messageOnTap, this.isStore = false, required this.order,
+    required this.isChatAllow, this.showCallButton = true});
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +76,7 @@ class InfoCardWidget extends StatelessWidget {
 
             showButton ? Row(children: [
 
-              TextButton.icon(
+              (showCallButton && phone != null && phone!.isNotEmpty) ? TextButton.icon(
                 onPressed: () async {
                   if(await canLaunchUrlString('tel:$phone')) {
                     launchUrlString('tel:$phone', mode: LaunchMode.externalApplication);
@@ -87,7 +89,7 @@ class InfoCardWidget extends StatelessWidget {
                   'call'.tr,
                   style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).primaryColor),
                 ),
-              ),
+              ) : const SizedBox(),
 
               isStore && isChatAllow ? order.isGuest! ? const SizedBox() : TextButton.icon(
                 onPressed: messageOnTap as void Function()?,

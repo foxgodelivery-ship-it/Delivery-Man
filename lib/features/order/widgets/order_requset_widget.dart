@@ -13,10 +13,13 @@ import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/common/widgets/confirmation_dialog_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_image_widget.dart';
+import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_details_screen.dart';
+import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
+import 'package:sixam_mart_delivery/features/chat/domain/models/conversation_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:sixam_mart_delivery/features/order/screens/order_location_screen.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 class OrderRequestWidget extends StatelessWidget {
   final OrderModel orderModel;
@@ -25,22 +28,78 @@ class OrderRequestWidget extends StatelessWidget {
   final Function onTap;
   const OrderRequestWidget({super.key, required this.orderModel, required this.index, required this.onTap, this.fromDetailsPage = false});
 
+  bool _isValidValue(String? value) => value != null && value.trim().isNotEmpty;
+
+  String _formatAddress(DeliveryAddress? address) {
+    if(address == null) {
+      return '';
+    }
+    final List<String> parts = [];
+    if(_isValidValue(address.address)) {
+      parts.add(address.address!.trim());
+    }
+    if(_isValidValue(address.house)) {
+      parts.add(address.house!.trim());
+    } else if(_isValidValue(address.streetNumber)) {
+      parts.add(address.streetNumber!.trim());
+    }
+    if(_isValidValue(address.floor)) {
+      parts.add(address.floor!.trim());
+    }
+    return parts.join(', ');
+  }
+
+  Future<void> _openNavigation({
+    required String? latitude,
+    required String? longitude,
+    required String? fallbackAddress,
+  }) async {
+    final bool hasCoordinates = _isValidValue(latitude) && _isValidValue(longitude) && latitude != '0' && longitude != '0';
+    final String destination = hasCoordinates
+        ? '${latitude!},${longitude!}'
+        : Uri.encodeComponent(fallbackAddress ?? '');
+    if(destination.isEmpty) {
+      showCustomSnackBar('address_not_found'.tr);
+      return;
+    }
+    final String url = 'https://www.google.com/maps/dir/?api=1&destination=$destination&mode=d';
+    if (await canLaunchUrlString(url)) {
+      await launchUrlString(url, mode: LaunchMode.externalApplication);
+    } else {
+      showCustomSnackBar('${'could_not_launch'.tr} $url');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     bool parcel = orderModel.orderType == 'parcel';
     double distance = Get.find<AddressController>().getRestaurantDistance(
       LatLng(double.parse(parcel ? orderModel.deliveryAddress?.latitude ?? '0' : orderModel.storeLat ?? '0'), double.parse(parcel ? orderModel.deliveryAddress?.longitude ?? '0' : orderModel.storeLng ?? '0')),
     );
+    final String pickupTitle = parcel ? 'Remetente' : (orderModel.storeName ?? 'store_not_found'.tr);
+    final String pickupAddress = parcel
+        ? _formatAddress(orderModel.deliveryAddress)
+        : (orderModel.storeAddress ?? 'address_not_found'.tr);
+    final String deliveryAddress = parcel ? _formatAddress(orderModel.receiverDetails) : _formatAddress(orderModel.deliveryAddress);
+    final String pickupAddressText = pickupAddress.isNotEmpty ? pickupAddress : 'address_not_found'.tr;
+    final String deliveryAddressText = deliveryAddress.isNotEmpty ? deliveryAddress : 'address_not_found'.tr;
+    final bool hasPickedUp = orderModel.orderStatus == 'picked_up';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeSmall),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
-      ),
-      child: GetBuilder<OrderController>(builder: (orderController) {
-        return Column(children: [
+    return LayoutBuilder(builder: (context, constraints) {
+      final double maxWidth = constraints.maxWidth >= 700 ? 520 : constraints.maxWidth;
+      return Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeSmall),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
+            ),
+            child: GetBuilder<OrderController>(builder: (orderController) {
+              return Column(children: [
 
           Padding(
             padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
@@ -111,60 +170,120 @@ class OrderRequestWidget extends StatelessWidget {
                 ]),
               ]),
 
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  width: 5,
-                  margin: const EdgeInsets.only(left: Dimensions.paddingSizeLarge),
-                  child: ListView.builder(
-                    itemCount: 4,
-                    shrinkWrap: true,
-                    itemBuilder: (context, index) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeExtraSmall),
-                        height: 5, width: 10, color: Colors.blue,
-                      );
-                    },
-                  ),
+              const SizedBox(height: Dimensions.paddingSizeSmall),
+
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('RETIRADA', style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall)),
+                const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                Text(
+                  pickupTitle,
+                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall),
                 ),
-              ),
-
-              Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(50),
-                  child: Image.asset(Images.dmAvatar, height: 45, width: 45, fit: BoxFit.contain),
+                const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                Text(
+                  pickupAddressText,
+                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor),
                 ),
-                const SizedBox(width: Dimensions.paddingSizeSmall),
-
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-                  Text(
-                    'deliver_to'.tr, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style:  robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall),
-                  ),
-                  const SizedBox(height: Dimensions.paddingSizeExtraSmall),
-
-                  Text(
-                    parcel ? orderModel.receiverDetails?.address ?? '' : orderModel.deliveryAddress?.address ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor),
-                  ),
-                ])),
-                const SizedBox(width: Dimensions.paddingSizeSmall),
-
-                InkWell(
-                  onTap: () => Get.to(()=> OrderLocationScreen(orderModel: orderModel, orderController: orderController, index: index, onTap: onTap,)),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: Dimensions.paddingSizeSmall),
-                    decoration: BoxDecoration(
-                      color: Colors.blue, borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => _openNavigation(
+                      latitude: parcel ? orderModel.deliveryAddress?.latitude : orderModel.storeLat,
+                      longitude: parcel ? orderModel.deliveryAddress?.longitude : orderModel.storeLng,
+                      fallbackAddress: pickupAddressText,
                     ),
-                    child: Text(
-                      'view_on_map'.tr,
-                      style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).cardColor),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: 4),
+                      minimumSize: const Size(0, 28),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: Icon(Icons.navigation, size: 16, color: Theme.of(context).primaryColor),
+                    label: Text(
+                      'Navegar até retirada',
+                      style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).primaryColor),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: Dimensions.paddingSizeSmall),
+                Text('ENTREGA', style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall)),
+                const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                Text(
+                  'Destinatário',
+                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall),
+                ),
+                const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                Text(
+                  deliveryAddressText,
+                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor),
+                ),
+                const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => _openNavigation(
+                      latitude: parcel ? orderModel.receiverDetails?.latitude : orderModel.deliveryAddress?.latitude,
+                      longitude: parcel ? orderModel.receiverDetails?.longitude : orderModel.deliveryAddress?.longitude,
+                      fallbackAddress: deliveryAddressText,
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: 4),
+                      minimumSize: const Size(0, 28),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: Icon(Icons.navigation, size: 16, color: Theme.of(context).primaryColor),
+                    label: Text(
+                      'Navegar até entrega',
+                      style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).primaryColor),
                     ),
                   ),
                 ),
               ]),
+              const SizedBox(height: Dimensions.paddingSizeSmall),
+
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () {
+                    if(hasPickedUp && orderModel.customer != null) {
+                      Get.toNamed(RouteHelper.getChatRoute(
+                        notificationBody: NotificationBodyModel(
+                          orderId: orderModel.id, customerId: orderModel.customer!.id,
+                        ),
+                        user: User(
+                          id: orderModel.customer!.id,
+                          fName: orderModel.customer!.fName,
+                          lName: orderModel.customer!.lName,
+                          imageFullUrl: orderModel.customer!.imageFullUrl,
+                        ),
+                      ));
+                    }else if(orderModel.storeId != null) {
+                      Get.toNamed(RouteHelper.getChatRoute(
+                        notificationBody: NotificationBodyModel(
+                          orderId: orderModel.id, vendorId: orderModel.storeId,
+                        ),
+                        user: User(
+                          id: orderModel.storeId,
+                          fName: orderModel.storeName,
+                          imageFullUrl: orderModel.storeLogoFullUrl,
+                        ),
+                      ));
+                    }else {
+                      showCustomSnackBar('Chat indisponível no momento.');
+                    }
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: 4),
+                    minimumSize: const Size(0, 28),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: Icon(Icons.message, size: 16, color: Theme.of(context).primaryColor),
+                  label: Text(
+                    'Chat',
+                    style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).primaryColor),
+                  ),
+                ),
+              ),
 
             ]),
           ),
@@ -262,6 +381,9 @@ class OrderRequestWidget extends StatelessWidget {
 
         ]);
       }),
-    );
+          ),
+        ),
+      );
+    });
   }
 }
