@@ -20,6 +20,19 @@ class OrderWidget extends StatelessWidget {
 
   bool _isValidValue(String? value) => value != null && value.trim().isNotEmpty;
 
+  String _addressNumber(DeliveryAddress? address) {
+    if (address == null) {
+      return '';
+    }
+    if (_isValidValue(address.house)) {
+      return address.house!.trim();
+    }
+    if (_isValidValue(address.streetNumber)) {
+      return address.streetNumber!.trim();
+    }
+    return '';
+  }
+
   String _formatAddress(DeliveryAddress? address) {
     if(address == null) {
       return '';
@@ -28,11 +41,9 @@ class OrderWidget extends StatelessWidget {
     if(_isValidValue(address.address)) {
       parts.add(address.address!.trim());
     }
-    if(_isValidValue(address.streetNumber)) {
-      parts.add(address.streetNumber!.trim());
-    }
-    if(_isValidValue(address.house)) {
-      parts.add(address.house!.trim());
+    final String number = _addressNumber(address);
+    if (number.isNotEmpty) {
+      parts.add(number);
     }
     if(_isValidValue(address.floor)) {
       parts.add(address.floor!.trim());

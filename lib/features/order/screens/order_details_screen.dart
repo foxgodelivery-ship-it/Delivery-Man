@@ -51,6 +51,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   String? _serverTimestampReference;
   DateTime? _serverReferenceTime;
   DateTime? _localReferenceTime;
+  int? _arrivalLoadedOrderId;
   static const int _waitDurationSeconds = 900;
   static const double _arrivalRadiusMeters = 80;
 
@@ -797,7 +798,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   );
 
   void _syncCustomerWaitState(OrderModel? order) {
-    _updateServerTimeReference(order);
     _loadArrivalState(order);
   }
 
@@ -808,7 +808,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       _serverTimestampReference = null;
       return;
     }
-    final String? updatedAt = order?.updatedAt;
+    final String? updatedAt = order.updatedAt;
     if (updatedAt == null || updatedAt == _serverTimestampReference) {
       return;
     }
@@ -880,6 +880,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       setState(() {
         _waitSecondsRemaining = 0;
         _arrivedAt = null;
+        _arrivalLoadedOrderId = null;
       });
     }
   }
@@ -901,16 +902,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       return;
     }
 
+    _updateServerTimeReference(order);
     final DateTime? arrivedAt = _getArrivalFromServer(order);
     if (arrivedAt == null) {
       _clearCustomerWaitState();
       return;
     }
 
-    final bool shouldUpdate = _arrivedAt == null || !_arrivedAt!.isAtSameMomentAs(arrivedAt);
+    final bool shouldUpdate = _arrivalLoadedOrderId != order.id || _arrivedAt == null || !_arrivedAt!.isAtSameMomentAs(arrivedAt);
     if (shouldUpdate) {
       setState(() {
         _arrivedAt = arrivedAt;
+        _arrivalLoadedOrderId = order.id;
         _waitSecondsRemaining = _calculateRemainingSeconds();
       });
       if (_waitSecondsRemaining > 0) {
@@ -992,6 +995,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
 
                   setState(() {
                     _arrivedAt = arrivedAt;
+                    _arrivalLoadedOrderId = order.id;
                     _waitSecondsRemaining = _calculateRemainingSeconds();
                   });
                   if (_waitSecondsRemaining > 0) {

@@ -17,6 +17,19 @@ class HistoryOrderWidget extends StatelessWidget {
 
   bool _isValidValue(String? value) => value != null && value.trim().isNotEmpty;
 
+  String _addressNumber(DeliveryAddress? address) {
+    if (address == null) {
+      return '';
+    }
+    if (_isValidValue(address.house)) {
+      return address.house!.trim();
+    }
+    if (_isValidValue(address.streetNumber)) {
+      return address.streetNumber!.trim();
+    }
+    return '';
+  }
+
   String _formatAddress(DeliveryAddress? address) {
     if(address == null) {
       return '';
@@ -25,11 +38,9 @@ class HistoryOrderWidget extends StatelessWidget {
     if(_isValidValue(address.address)) {
       parts.add(address.address!.trim());
     }
-    if(_isValidValue(address.streetNumber)) {
-      parts.add(address.streetNumber!.trim());
-    }
-    if(_isValidValue(address.house)) {
-      parts.add(address.house!.trim());
+    final String number = _addressNumber(address);
+    if (number.isNotEmpty) {
+      parts.add(number);
     }
     if(_isValidValue(address.floor)) {
       parts.add(address.floor!.trim());
@@ -77,8 +88,8 @@ class HistoryOrderWidget extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeSmall),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
-          boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
-          borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+          boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.08), spreadRadius: 1, blurRadius: 12, offset: const Offset(0, 4))],
+          borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
         ),
         child: Column(children: [
           Row(children: [

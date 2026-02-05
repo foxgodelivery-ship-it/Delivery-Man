@@ -61,14 +61,7 @@ class InfoCardWidget extends StatelessWidget {
             SizedBox(height: address!.address != null ? Dimensions.paddingSizeExtraSmall : 0),
 
             Wrap(children: [
-              (address!.streetNumber != null && address!.streetNumber!.isNotEmpty) ? Text('${'street_number'.tr}: ${address!.streetNumber!}, ',
-                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor), maxLines: 1, overflow: TextOverflow.ellipsis,
-              ) : const SizedBox(),
-
-              (address!.house != null && address!.house!.isNotEmpty) ? Text('${'house'.tr}: ${address!.house!}, ',
-                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor), maxLines: 1, overflow: TextOverflow.ellipsis,
-              ) : const SizedBox(),
-
+              _buildAddressNumber(context, address),
               (address!.floor != null && address!.floor!.isNotEmpty) ? Text('${'floor'.tr}: ${address!.floor!}' ,
                 style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor), maxLines: 1, overflow: TextOverflow.ellipsis,
               ) : const SizedBox(),
@@ -125,6 +118,25 @@ class InfoCardWidget extends StatelessWidget {
           child: Text('no_store_data_found'.tr, style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall)))),
 
       ]),
+    );
+  }
+
+  Widget _buildAddressNumber(BuildContext context, DeliveryAddress? address) {
+    if (address == null) {
+      return const SizedBox();
+    }
+    final String? number = (address.house != null && address.house!.isNotEmpty)
+        ? address.house
+        : (address.streetNumber != null && address.streetNumber!.isNotEmpty)
+            ? address.streetNumber
+            : null;
+    if (number == null || number.isEmpty) {
+      return const SizedBox();
+    }
+    final String label = (address.house != null && address.house!.isNotEmpty) ? 'house'.tr : 'street_number'.tr;
+    return Text('$label: $number, ',
+      style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor),
+      maxLines: 1, overflow: TextOverflow.ellipsis,
     );
   }
 }
