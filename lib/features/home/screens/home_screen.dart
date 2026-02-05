@@ -19,6 +19,7 @@ import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/order_shimmer_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/order_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/title_widget.dart';
+import 'package:sixam_mart_delivery/common/widgets/confirmation_dialog_widget.dart';
 import 'package:sixam_mart_delivery/features/home/widgets/count_card_widget.dart';
 import 'package:sixam_mart_delivery/features/home/widgets/earning_widget.dart';
 import 'package:sixam_mart_delivery/features/order/screens/running_order_screen.dart';
@@ -204,27 +205,35 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.home_outlined),
-              title: const Text('Início'),
-              onTap: () {
-                Get.back();
-                Get.toNamed(RouteHelper.getMainRoute('home'));
-              },
-            ),
-            ListTile(
               leading: const Icon(Icons.assignment_outlined),
-              title: const Text('Solicitações'),
-              onTap: () {
-                Get.back();
-                Get.toNamed(RouteHelper.getMainRoute('order-request'));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.shopping_bag_outlined),
-              title: const Text('Pedidos'),
+              title: const Text('Atividades'),
               onTap: () {
                 Get.back();
                 Get.toNamed(RouteHelper.getMainRoute('order'));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet_outlined),
+              title: const Text('Ganhos'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getMyEarningRoute());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.payments_outlined),
+              title: const Text('Carteira / Saques'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getWithdrawMethodRoute());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Chat'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getConversationListRoute());
               },
             ),
             ListTile(
@@ -236,33 +245,25 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: const Text('Conversas'),
+              leading: const Icon(Icons.card_giftcard_outlined),
+              title: const Text('Refer & Ganhe'),
+              onTap: () {
+                Get.back();
+                Get.to(() => const ReferAndEarnScreen());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.support_agent_outlined),
+              title: const Text('Suporte / SOS'),
               onTap: () {
                 Get.back();
                 Get.toNamed(RouteHelper.getConversationListRoute());
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.account_circle_outlined),
-              title: const Text('Conta'),
-              onTap: () {
-                Get.back();
-                Get.toNamed(RouteHelper.getMainRoute('profile'));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.account_balance_wallet_outlined),
-              title: const Text('Ganhos'),
-              onTap: () {
-                Get.back();
-                Get.toNamed(RouteHelper.getMyEarningRoute());
-              },
-            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.description_outlined),
-              title: const Text('Termos e condições'),
+              title: const Text('Termos'),
               onTap: () {
                 Get.back();
                 Get.toNamed(RouteHelper.getTermsRoute());
@@ -270,10 +271,27 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.privacy_tip_outlined),
-              title: const Text('Política de privacidade'),
+              title: const Text('Privacidade'),
               onTap: () {
                 Get.back();
                 Get.toNamed(RouteHelper.getPrivacyRoute());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Sair'),
+              onTap: () {
+                Get.back();
+                Get.dialog(ConfirmationDialogWidget(
+                  icon: Images.support,
+                  description: 'are_you_sure_to_logout'.tr,
+                  isLogOut: true,
+                  onYesPressed: () {
+                    Get.find<AuthController>().clearSharedData();
+                    Get.find<ProfileController>().stopLocationRecord();
+                    Get.offAllNamed(RouteHelper.getSignInRoute());
+                  },
+                ));
               },
             ),
           ],
@@ -372,11 +390,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         ) : const SizedBox(),
                         SizedBox(height: hasActiveOrder ? Dimensions.paddingSizeExtraSmall : 0),
 
-                        orderController.currentOrderList == null ? OrderShimmerWidget(
-                          isEnabled: orderController.currentOrderList == null,
-                        ) : orderController.currentOrderList!.isNotEmpty ? OrderWidget(
-                          orderModel: orderController.currentOrderList![0], isRunningOrder: true, orderIndex: 0, cardWidth: context.width * 0.9,
-                        ) : const SizedBox(),
+                        orderController.currentOrderList == null || orderController.currentOrderList!.isNotEmpty
+                            ? LayoutBuilder(builder: (context, constraints) {
+                          final double cardWidth = constraints.maxWidth >= 700 ? 520 : constraints.maxWidth * 0.9;
+                          final Widget orderCard = orderController.currentOrderList == null
+                              ? OrderShimmerWidget(isEnabled: orderController.currentOrderList == null)
+                              : OrderWidget(
+                                orderModel: orderController.currentOrderList![0],
+                                isRunningOrder: true,
+                                orderIndex: 0,
+                                cardWidth: cardWidth,
+                              );
+                          return Align(
+                            alignment: Alignment.topCenter,
+                            child: SizedBox(width: cardWidth, child: orderCard),
+                          );
+                        })
+                            : const SizedBox(),
                         SizedBox(height: hasActiveOrder ? Dimensions.paddingSizeDefault : 0),
 
                       ]),

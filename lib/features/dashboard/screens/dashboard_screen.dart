@@ -230,13 +230,13 @@ class DashboardScreenState extends State<DashboardScreen> {
     }
 
     if (permission == LocationPermission.deniedForever) {
-      showCustomSnackBar('Abra as configurações e permita localização.');
+      showCustomSnackBar('Abra as configurações do Android e permita a localização.');
       return;
     }
 
-    final Position position = await Geolocator.getCurrentPosition();
+    final Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
     if (position.isMocked) {
-      showCustomSnackBar('Localização inválida. Desative o GPS simulado.');
+      showCustomSnackBar('Localização inválida detectada. Desative apps de localização falsa para continuar.');
       return;
     }
 
