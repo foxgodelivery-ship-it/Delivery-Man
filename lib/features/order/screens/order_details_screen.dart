@@ -50,9 +50,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   DateTime? _arrivedAt;
   int? _trackedOrderId;
   String? _trackedOrderStatus;
-  int? _arrivalLoadedOrderId;
   String? _serverTimestampReference;
-  Duration _serverTimeOffset = Duration.zero;
+  DateTime? _serverReferenceTime;
+  DateTime? _localReferenceTime;
   static const int _waitDurationSeconds = 900;
   static const double _arrivalRadiusMeters = 80;
 
@@ -801,22 +801,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     final currentId = order?.id;
     final currentStatus = order?.orderStatus;
 
-    _updateServerTimeOffset(order);
+    _updateServerTimeReference(order);
 
     if (_trackedOrderId != currentId || _trackedOrderStatus != currentStatus) {
       _trackedOrderId = currentId;
       _trackedOrderStatus = currentStatus;
       if (currentStatus != AppConstants.pickedUp) {
-        _clearCustomerWaitState(orderId: currentId);
+        _clearCustomerWaitState();
       } else if (order != null) {
-        _loadArrivalState(order);
+        _setArrivalFromServer(order);
       }
     } else if (currentStatus == AppConstants.pickedUp && order != null) {
-      _loadArrivalState(order);
+      _setArrivalFromServer(order);
     }
   }
 
-  void _updateServerTimeOffset(OrderModel? order) {
+  void _updateServerTimeReference(OrderModel? order) {
     final String? updatedAt = order?.updatedAt;
     if (updatedAt == null || updatedAt == _serverTimestampReference) {
       return;
@@ -824,12 +824,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
 
     try {
       final DateTime serverTime = DateConverterHelper.dateTimeStringToDate(updatedAt);
-      _serverTimeOffset = serverTime.difference(DateTime.now());
+      _serverReferenceTime = serverTime;
+      _localReferenceTime = DateTime.now();
       _serverTimestampReference = updatedAt;
     } catch (_) {
-      _serverTimeOffset = Duration.zero;
+      _serverReferenceTime = null;
+      _localReferenceTime = null;
       _serverTimestampReference = null;
     }
+  }
+
+  DateTime? _currentServerTime() {
+    if (_serverReferenceTime == null || _localReferenceTime == null) {
+      return null;
+    }
+    final Duration elapsed = DateTime.now().difference(_localReferenceTime!);
+    return _serverReferenceTime!.add(elapsed);
   }
 
   void _startCustomerWaitTimer() {
@@ -861,7 +871,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     if (_arrivedAt == null) {
       return 0;
     }
-    final DateTime serverNow = DateTime.now().add(_serverTimeOffset);
+    final DateTime? serverNow = _currentServerTime();
+    if (serverNow == null) {
+      return 0;
+    }
     final int remaining = _arrivedAt!
         .add(const Duration(seconds: _waitDurationSeconds))
         .difference(serverNow)
@@ -869,14 +882,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     return remaining > 0 ? remaining : 0;
   }
 
-  void _clearCustomerWaitState({int? orderId}) {
+  void _clearCustomerWaitState() {
     _customerWaitTimer?.cancel();
     _customerWaitTimer = null;
     if (mounted) {
       setState(() {
         _waitSecondsRemaining = 0;
         _arrivedAt = null;
-        _arrivalLoadedOrderId = null;
       });
     }
   }
@@ -891,6 +903,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
         parsed = null;
       }
     }
+    return null;
+  }
 
     if (parsed != null) {
       final bool shouldUpdate = _arrivalLoadedOrderId != order.id || _arrivedAt == null || !_arrivedAt!.isAtSameMomentAs(parsed);
@@ -907,10 +921,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
         _startCustomerWaitTimer();
       }
     } else {
-      setState(() {
-        _arrivedAt = null;
-        _waitSecondsRemaining = 0;
-      });
+      _customerWaitTimer?.cancel();
     }
   }
 
