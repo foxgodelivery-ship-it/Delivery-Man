@@ -29,7 +29,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher_string.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final int? orderId;
@@ -51,9 +50,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   DateTime? _arrivedAt;
   int? _trackedOrderId;
   String? _trackedOrderStatus;
-  int? _arrivalLoadedOrderId;
   String? _serverTimestampReference;
-  Duration _serverTimeOffset = Duration.zero;
+  DateTime? _serverReferenceTime;
+  DateTime? _localReferenceTime;
   static const int _waitDurationSeconds = 900;
   static const double _arrivalRadiusMeters = 80;
 
@@ -802,22 +801,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     final currentId = order?.id;
     final currentStatus = order?.orderStatus;
 
-    _updateServerTimeOffset(order);
+    _updateServerTimeReference(order);
 
     if (_trackedOrderId != currentId || _trackedOrderStatus != currentStatus) {
       _trackedOrderId = currentId;
       _trackedOrderStatus = currentStatus;
       if (currentStatus != AppConstants.pickedUp) {
-        _clearCustomerWaitState(orderId: currentId);
+        _clearCustomerWaitState();
       } else if (order != null) {
-        _loadArrivalState(order);
+        _setArrivalFromServer(order);
       }
     } else if (currentStatus == AppConstants.pickedUp && order != null) {
-      _loadArrivalState(order);
+      _setArrivalFromServer(order);
     }
   }
 
-  void _updateServerTimeOffset(OrderModel? order) {
+  void _updateServerTimeReference(OrderModel? order) {
     final String? updatedAt = order?.updatedAt;
     if (updatedAt == null || updatedAt == _serverTimestampReference) {
       return;
@@ -825,12 +824,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
 
     try {
       final DateTime serverTime = DateConverterHelper.dateTimeStringToDate(updatedAt);
-      _serverTimeOffset = serverTime.difference(DateTime.now());
+      _serverReferenceTime = serverTime;
+      _localReferenceTime = DateTime.now();
       _serverTimestampReference = updatedAt;
     } catch (_) {
-      _serverTimeOffset = Duration.zero;
+      _serverReferenceTime = null;
+      _localReferenceTime = null;
       _serverTimestampReference = null;
     }
+  }
+
+  DateTime? _currentServerTime() {
+    if (_serverReferenceTime == null || _localReferenceTime == null) {
+      return null;
+    }
+    final Duration elapsed = DateTime.now().difference(_localReferenceTime!);
+    return _serverReferenceTime!.add(elapsed);
   }
 
   void _startCustomerWaitTimer() {
@@ -862,7 +871,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     if (_arrivedAt == null) {
       return 0;
     }
-    final DateTime serverNow = DateTime.now().add(_serverTimeOffset);
+    final DateTime? serverNow = _currentServerTime();
+    if (serverNow == null) {
+      return 0;
+    }
     final int remaining = _arrivedAt!
         .add(const Duration(seconds: _waitDurationSeconds))
         .difference(serverNow)
@@ -870,46 +882,39 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     return remaining > 0 ? remaining : 0;
   }
 
-  void _clearCustomerWaitState({int? orderId}) {
+  void _clearCustomerWaitState() {
     _customerWaitTimer?.cancel();
     _customerWaitTimer = null;
-    if (orderId != null) {
-      Get.find<SharedPreferences>().remove(_arrivalKey(orderId));
-    }
     if (mounted) {
       setState(() {
         _waitSecondsRemaining = 0;
         _arrivedAt = null;
-        _arrivalLoadedOrderId = null;
       });
     }
   }
 
-  void _loadArrivalState(OrderModel order) {
-    if (_arrivalLoadedOrderId == order.id) {
-      return;
+  DateTime? _getArrivalFromServer(OrderModel order) {
+    if (order.pickedUpAt != null) {
+      return DateConverterHelper.dateTimeStringToDate(order.pickedUpAt!);
     }
+    if (order.orderStatus == AppConstants.pickedUp && order.updatedAt != null) {
+      return DateConverterHelper.dateTimeStringToDate(order.updatedAt!);
+    }
+    return null;
+  }
 
-    _arrivalLoadedOrderId = order.id;
-    final String? stored = Get.find<SharedPreferences>().getString(_arrivalKey(order.id!));
-    final DateTime? parsed = stored != null ? DateTime.tryParse(stored) : null;
-    if (parsed != null) {
-      setState(() {
-        _arrivedAt = parsed;
-        _waitSecondsRemaining = _calculateRemainingSeconds();
-      });
-      if (_waitSecondsRemaining > 0) {
-        _startCustomerWaitTimer();
-      }
+  void _setArrivalFromServer(OrderModel order) {
+    final DateTime? arrival = _getArrivalFromServer(order);
+    setState(() {
+      _arrivedAt = arrival;
+      _waitSecondsRemaining = _calculateRemainingSeconds();
+    });
+    if (_waitSecondsRemaining > 0) {
+      _startCustomerWaitTimer();
     } else {
-      setState(() {
-        _arrivedAt = null;
-        _waitSecondsRemaining = 0;
-      });
+      _customerWaitTimer?.cancel();
     }
   }
-
-  String _arrivalKey(int orderId) => '${AppConstants.customerArrivedAtPrefix}$orderId';
 
   String _formatWaitTime(int seconds) {
     final int minutes = seconds ~/ 60;
@@ -975,13 +980,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
               onPressed: () async {
                 final bool isWithinRadius = await _isWithinCustomerRadius(order);
                 if (isWithinRadius) {
-                  final DateTime arrivedAt = DateTime.now().add(_serverTimeOffset);
-                  await Get.find<SharedPreferences>().setString(_arrivalKey(order.id!), arrivedAt.toIso8601String());
-                  setState(() {
-                    _arrivedAt = arrivedAt;
-                    _arrivalLoadedOrderId = order.id;
-                  });
-                  _startCustomerWaitTimer();
+                  _setArrivalFromServer(order);
                 }
               },
             ),
