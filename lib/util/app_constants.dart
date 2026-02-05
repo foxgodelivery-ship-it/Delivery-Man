@@ -89,6 +89,7 @@ class AppConstants {
   static const String localizationKey = 'X-localization';
   static const String langIntro = 'language_intro';
   static const String notificationIdList = 'notification_id_list';
+  static const String customerArrivedAtPrefix = 'customer_arrived_at_';
 
   /// Status
   static const String pending = 'pending';
