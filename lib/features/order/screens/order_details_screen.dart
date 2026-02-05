@@ -893,18 +893,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     }
   }
 
-  void _loadArrivalState(OrderModel order) {
-    final String? pickedUpAt = order.updatedAt;
+  void _setArrivalFromServer(OrderModel order) {
     DateTime? parsed;
-    if (pickedUpAt != null) {
+    if (order.orderStatus == AppConstants.pickedUp && order.updatedAt != null) {
       try {
-        parsed = DateConverterHelper.dateTimeStringToDate(pickedUpAt);
+        parsed = DateConverterHelper.dateTimeStringToDate(order.updatedAt!);
       } catch (_) {
         parsed = null;
       }
     }
-    return null;
-  }
 
     if (parsed != null) {
       final bool shouldUpdate = _arrivalLoadedOrderId != order.id || _arrivedAt == null || !_arrivedAt!.isAtSameMomentAs(parsed);
@@ -989,15 +986,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
               onPressed: () async {
                 final bool isWithinRadius = await _isWithinCustomerRadius(order);
                 if (isWithinRadius) {
-                  final String? pickedUpAt = order.updatedAt;
-                  if (pickedUpAt == null) {
+                  final String? updatedAt = order.updatedAt;
+                  if (updatedAt == null) {
                     showCustomSnackBar('Não foi possível obter o horário do servidor.');
                     return;
                   }
 
                   DateTime? arrivedAt;
                   try {
-                    arrivedAt = DateConverterHelper.dateTimeStringToDate(pickedUpAt);
+                    arrivedAt = DateConverterHelper.dateTimeStringToDate(updatedAt);
                   } catch (_) {
                     arrivedAt = null;
                   }
