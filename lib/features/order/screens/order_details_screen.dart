@@ -893,24 +893,33 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     }
   }
 
-  DateTime? _getArrivalFromServer(OrderModel order) {
-    if (order.pickedUpAt != null) {
-      return DateConverterHelper.dateTimeStringToDate(order.pickedUpAt!);
-    }
-    if (order.orderStatus == AppConstants.pickedUp && order.updatedAt != null) {
-      return DateConverterHelper.dateTimeStringToDate(order.updatedAt!);
+  void _loadArrivalState(OrderModel order) {
+    final String? pickedUpAt = order.updatedAt;
+    DateTime? parsed;
+    if (pickedUpAt != null) {
+      try {
+        parsed = DateConverterHelper.dateTimeStringToDate(pickedUpAt);
+      } catch (_) {
+        parsed = null;
+      }
     }
     return null;
   }
 
-  void _setArrivalFromServer(OrderModel order) {
-    final DateTime? arrival = _getArrivalFromServer(order);
-    setState(() {
-      _arrivedAt = arrival;
-      _waitSecondsRemaining = _calculateRemainingSeconds();
-    });
-    if (_waitSecondsRemaining > 0) {
-      _startCustomerWaitTimer();
+    if (parsed != null) {
+      final bool shouldUpdate = _arrivalLoadedOrderId != order.id || _arrivedAt == null || !_arrivedAt!.isAtSameMomentAs(parsed);
+      if (!shouldUpdate) {
+        return;
+      }
+
+      setState(() {
+        _arrivedAt = parsed;
+        _arrivalLoadedOrderId = order.id;
+        _waitSecondsRemaining = _calculateRemainingSeconds();
+      });
+      if (_waitSecondsRemaining > 0) {
+        _startCustomerWaitTimer();
+      }
     } else {
       _customerWaitTimer?.cancel();
     }
@@ -980,7 +989,32 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
               onPressed: () async {
                 final bool isWithinRadius = await _isWithinCustomerRadius(order);
                 if (isWithinRadius) {
-                  _setArrivalFromServer(order);
+                  final String? pickedUpAt = order.updatedAt;
+                  if (pickedUpAt == null) {
+                    showCustomSnackBar('Não foi possível obter o horário do servidor.');
+                    return;
+                  }
+
+                  DateTime? arrivedAt;
+                  try {
+                    arrivedAt = DateConverterHelper.dateTimeStringToDate(pickedUpAt);
+                  } catch (_) {
+                    arrivedAt = null;
+                  }
+
+                  if (arrivedAt == null) {
+                    showCustomSnackBar('Não foi possível obter o horário do servidor.');
+                    return;
+                  }
+
+                  setState(() {
+                    _arrivedAt = arrivedAt;
+                    _arrivalLoadedOrderId = order.id;
+                    _waitSecondsRemaining = _calculateRemainingSeconds();
+                  });
+                  if (_waitSecondsRemaining > 0) {
+                    _startCustomerWaitTimer();
+                  }
                 }
               },
             ),
