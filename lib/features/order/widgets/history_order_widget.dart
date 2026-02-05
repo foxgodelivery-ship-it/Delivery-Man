@@ -25,10 +25,11 @@ class HistoryOrderWidget extends StatelessWidget {
     if(_isValidValue(address.address)) {
       parts.add(address.address!.trim());
     }
+    if(_isValidValue(address.streetNumber)) {
+      parts.add(address.streetNumber!.trim());
+    }
     if(_isValidValue(address.house)) {
       parts.add(address.house!.trim());
-    } else if(_isValidValue(address.streetNumber)) {
-      parts.add(address.streetNumber!.trim());
     }
     if(_isValidValue(address.floor)) {
       parts.add(address.floor!.trim());

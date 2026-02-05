@@ -48,9 +48,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   Timer? _customerWaitTimer;
   int _waitSecondsRemaining = 0;
   DateTime? _arrivedAt;
-  int? _arrivalLoadedOrderId;
-  int? _trackedOrderId;
-  String? _trackedOrderStatus;
   String? _serverTimestampReference;
   DateTime? _serverReferenceTime;
   DateTime? _localReferenceTime;
@@ -354,7 +351,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                     longitude: parcel ? controllerOrderModel.receiverDetails!.longitude : controllerOrderModel.deliveryAddress!.longitude,
                     showButton: controllerOrderModel.orderStatus != 'delivered' && controllerOrderModel.orderStatus != 'failed'
                         && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded',
-                    isStore: parcel ? false : true, isChatAllow: canChatCustomer,
+                    isStore: false, isChatAllow: canChatCustomer,
                     showCallButton: false,
                     messageOnTap: canChatCustomer ? () => Get.toNamed(RouteHelper.getChatRoute(
                       notificationBody: NotificationBodyModel(
@@ -800,15 +797,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   );
 
   void _syncCustomerWaitState(OrderModel? order) {
-    final currentId = order?.id;
-    final currentStatus = order?.orderStatus;
-
     _updateServerTimeReference(order);
-
-    if (_trackedOrderId != currentId || _trackedOrderStatus != currentStatus) {
-      _trackedOrderId = currentId;
-      _trackedOrderStatus = currentStatus;
-    }
     _loadArrivalState(order);
   }
 
@@ -891,7 +880,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       setState(() {
         _waitSecondsRemaining = 0;
         _arrivedAt = null;
-        _arrivalLoadedOrderId = null;
       });
     }
   }
@@ -919,20 +907,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       return;
     }
 
-    final bool shouldUpdate = _arrivalLoadedOrderId != order.id ||
-        _arrivedAt == null ||
-        !_arrivedAt!.isAtSameMomentAs(arrivedAt);
-    if (!shouldUpdate) {
-      return;
-    }
-
-    setState(() {
-      _arrivedAt = arrivedAt;
-      _arrivalLoadedOrderId = order.id;
-      _waitSecondsRemaining = _calculateRemainingSeconds();
-    });
-    if (_waitSecondsRemaining > 0) {
-      _startCustomerWaitTimer();
+    final bool shouldUpdate = _arrivedAt == null || !_arrivedAt!.isAtSameMomentAs(arrivedAt);
+    if (shouldUpdate) {
+      setState(() {
+        _arrivedAt = arrivedAt;
+        _waitSecondsRemaining = _calculateRemainingSeconds();
+      });
+      if (_waitSecondsRemaining > 0) {
+        _startCustomerWaitTimer();
+      }
     }
   }
 
@@ -1009,7 +992,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
 
                   setState(() {
                     _arrivedAt = arrivedAt;
-                    _arrivalLoadedOrderId = order.id;
                     _waitSecondsRemaining = _calculateRemainingSeconds();
                   });
                   if (_waitSecondsRemaining > 0) {
@@ -1051,11 +1033,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                           ),
                         );
                       } else {
-                        Get.find<OrderController>().updateOrderStatus(
-                          order,
-                          AppConstants.failed,
-                          comment: 'Cliente não encontrado',
-                        );
+                        Get.toNamed(RouteHelper.getConversationListRoute());
+                        showCustomSnackBar('Para pedido normal, finalize via suporte no painel.');
                       }
                     }
                   },
@@ -1071,9 +1050,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     final bool isParcelReturnPending = order.orderType == 'parcel'
         && order.orderStatus == AppConstants.canceled
         && order.parcelCancellation?.beforePickup != 1;
-    final bool isReturnFlow = order.orderStatus == AppConstants.failed
-        || order.orderStatus == AppConstants.returned
-        || isParcelReturnPending;
+    final bool isReturnFlow = order.orderStatus == AppConstants.returned || isParcelReturnPending;
     if (!isReturnFlow || order.storeLat == null || order.storeLng == null) {
       return const SizedBox();
     }
