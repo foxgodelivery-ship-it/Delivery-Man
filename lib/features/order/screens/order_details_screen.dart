@@ -195,7 +195,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
             }
             final bool hasPickedUp = controllerOrderModel?.orderStatus == 'picked_up';
             final bool canChatCustomer = showChatPermission && hasPickedUp && controllerOrderModel?.customer != null;
-            final bool isWaitingForCustomer = hasPickedUp && _arrivedAt != null && _waitSecondsRemaining > 0;
+            final bool waitingActive = _arrivedAt != null && _waitSecondsRemaining > 0;
 
             return (orderController.orderDetailsModel != null && controllerOrderModel != null) ? Column(children: [
 
@@ -755,7 +755,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
               _buildCustomerArrivalSection(controllerOrderModel),
               _buildReturnNavigationSection(controllerOrderModel),
 
-              isWaitingForCustomer ? const SizedBox() : (parcel ? ParcelBottomView(
+              waitingActive ? const SizedBox() : (parcel ? ParcelBottomView(
                 orderController: orderController, controllerOrderModel: controllerOrderModel, orderId: widget.orderId!,
                 fromLocationScreen: widget.fromLocationScreen, showDeliveryConfirmImage: showDeliveryConfirmImage,
               ) : RegularOrderBottomView(
@@ -918,6 +918,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       });
       if (_waitSecondsRemaining > 0) {
         _startCustomerWaitTimer();
+      } else {
+        _customerWaitTimer?.cancel();
       }
     }
   }
@@ -969,8 +971,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     }
 
     final bool hasArrived = _arrivedAt != null;
-    final bool waitingActive = hasArrived && _waitSecondsRemaining > 0;
-    final bool canFinalize = hasArrived && _waitSecondsRemaining == 0;
+    final bool waitingActive = _arrivedAt != null && _waitSecondsRemaining > 0;
+    final bool canFinalize = _arrivedAt != null && _waitSecondsRemaining == 0;
 
     return Container(
       width: double.infinity,
@@ -986,21 +988,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
               buttonText: 'Cheguei no cliente',
               onPressed: () async {
                 final bool isWithinRadius = await _isWithinCustomerRadius(order);
-                if (isWithinRadius) {
-                  final DateTime? arrivedAt = _getArrivalFromServer(order);
-                  if (arrivedAt == null) {
-                    showCustomSnackBar('Não foi possível obter o horário do servidor.');
-                    return;
-                  }
+                if (!isWithinRadius) {
+                  return;
+                }
+                final DateTime? arrivedAt = _getArrivalFromServer(order);
+                if (arrivedAt == null) {
+                  showCustomSnackBar('Não foi possível obter o horário do servidor.');
+                  return;
+                }
 
-                  setState(() {
-                    _arrivedAt = arrivedAt;
-                    _arrivalLoadedOrderId = order.id;
-                    _waitSecondsRemaining = _calculateRemainingSeconds();
-                  });
-                  if (_waitSecondsRemaining > 0) {
-                    _startCustomerWaitTimer();
-                  }
+                setState(() {
+                  _arrivedAt = arrivedAt;
+                  _arrivalLoadedOrderId = order.id;
+                  _waitSecondsRemaining = _calculateRemainingSeconds();
+                });
+                if (_waitSecondsRemaining > 0) {
+                  _startCustomerWaitTimer();
                 }
               },
             ),
