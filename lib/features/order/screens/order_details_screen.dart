@@ -29,6 +29,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher_string.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final int? orderId;
@@ -47,11 +48,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   Timer? _timer;
   Timer? _customerWaitTimer;
   int _waitSecondsRemaining = 0;
-  bool _customerArrived = false;
-  bool _customerNoResponseReported = false;
+  DateTime? _arrivedAt;
   int? _trackedOrderId;
   String? _trackedOrderStatus;
-  static const int _waitDurationSeconds = 300;
+  int? _arrivalLoadedOrderId;
+  String? _serverTimestampReference;
+  Duration _serverTimeOffset = Duration.zero;
+  static const int _waitDurationSeconds = 900;
   static const double _arrivalRadiusMeters = 80;
 
   void _startApiCalling(){
@@ -798,49 +801,115 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   void _syncCustomerWaitState(OrderModel? order) {
     final currentId = order?.id;
     final currentStatus = order?.orderStatus;
+
+    _updateServerTimeOffset(order);
+
     if (_trackedOrderId != currentId || _trackedOrderStatus != currentStatus) {
       _trackedOrderId = currentId;
       _trackedOrderStatus = currentStatus;
       if (currentStatus != AppConstants.pickedUp) {
-        _stopCustomerWaitTimer();
+        _clearCustomerWaitState(orderId: currentId);
+      } else if (order != null) {
+        _loadArrivalState(order);
       }
+    } else if (currentStatus == AppConstants.pickedUp && order != null) {
+      _loadArrivalState(order);
+    }
+  }
+
+  void _updateServerTimeOffset(OrderModel? order) {
+    final String? updatedAt = order?.updatedAt;
+    if (updatedAt == null || updatedAt == _serverTimestampReference) {
+      return;
+    }
+
+    try {
+      final DateTime serverTime = DateConverterHelper.dateTimeStringToDate(updatedAt);
+      _serverTimeOffset = serverTime.difference(DateTime.now());
+      _serverTimestampReference = updatedAt;
+    } catch (_) {
+      _serverTimeOffset = Duration.zero;
+      _serverTimestampReference = null;
     }
   }
 
   void _startCustomerWaitTimer() {
     _customerWaitTimer?.cancel();
-    setState(() {
-      _waitSecondsRemaining = _waitDurationSeconds;
-    });
+    _updateWaitSecondsRemaining();
     _customerWaitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      if (_waitSecondsRemaining <= 1) {
-        timer.cancel();
-        setState(() {
-          _waitSecondsRemaining = 0;
-        });
-      } else {
-        setState(() {
-          _waitSecondsRemaining = _waitSecondsRemaining - 1;
-        });
-      }
+      _updateWaitSecondsRemaining();
     });
   }
 
-  void _stopCustomerWaitTimer() {
+  void _updateWaitSecondsRemaining() {
+    final int remaining = _calculateRemainingSeconds();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _waitSecondsRemaining = remaining;
+    });
+    if (remaining == 0) {
+      _customerWaitTimer?.cancel();
+    }
+  }
+
+  int _calculateRemainingSeconds() {
+    if (_arrivedAt == null) {
+      return 0;
+    }
+    final DateTime serverNow = DateTime.now().add(_serverTimeOffset);
+    final int remaining = _arrivedAt!
+        .add(const Duration(seconds: _waitDurationSeconds))
+        .difference(serverNow)
+        .inSeconds;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  void _clearCustomerWaitState({int? orderId}) {
     _customerWaitTimer?.cancel();
     _customerWaitTimer = null;
+    if (orderId != null) {
+      Get.find<SharedPreferences>().remove(_arrivalKey(orderId));
+    }
     if (mounted) {
       setState(() {
         _waitSecondsRemaining = 0;
-        _customerArrived = false;
-        _customerNoResponseReported = false;
+        _arrivedAt = null;
+        _arrivalLoadedOrderId = null;
       });
     }
   }
+
+  void _loadArrivalState(OrderModel order) {
+    if (_arrivalLoadedOrderId == order.id) {
+      return;
+    }
+
+    _arrivalLoadedOrderId = order.id;
+    final String? stored = Get.find<SharedPreferences>().getString(_arrivalKey(order.id!));
+    final DateTime? parsed = stored != null ? DateTime.tryParse(stored) : null;
+    if (parsed != null) {
+      setState(() {
+        _arrivedAt = parsed;
+        _waitSecondsRemaining = _calculateRemainingSeconds();
+      });
+      if (_waitSecondsRemaining > 0) {
+        _startCustomerWaitTimer();
+      }
+    } else {
+      setState(() {
+        _arrivedAt = null;
+        _waitSecondsRemaining = 0;
+      });
+    }
+  }
+
+  String _arrivalKey(int orderId) => '${AppConstants.customerArrivedAtPrefix}$orderId';
 
   String _formatWaitTime(int seconds) {
     final int minutes = seconds ~/ 60;
@@ -888,8 +957,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       return const SizedBox();
     }
 
-    final bool isWaiting = _customerArrived && _waitSecondsRemaining > 0;
-    final bool canFinalize = _customerArrived && _waitSecondsRemaining == 0;
+    final bool hasArrived = _arrivedAt != null;
+    final bool canFinalize = hasArrived && _waitSecondsRemaining == 0;
 
     return Container(
       width: double.infinity,
@@ -900,21 +969,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       ),
       child: Column(
         children: [
-          if (!_customerArrived)
+          if (!hasArrived)
             CustomButtonWidget(
               buttonText: 'Cheguei no cliente',
               onPressed: () async {
                 final bool isWithinRadius = await _isWithinCustomerRadius(order);
                 if (isWithinRadius) {
+                  final DateTime arrivedAt = DateTime.now().add(_serverTimeOffset);
+                  await Get.find<SharedPreferences>().setString(_arrivalKey(order.id!), arrivedAt.toIso8601String());
                   setState(() {
-                    _customerArrived = true;
-                    _customerNoResponseReported = false;
+                    _arrivedAt = arrivedAt;
+                    _arrivalLoadedOrderId = order.id;
                   });
                   _startCustomerWaitTimer();
                 }
               },
             ),
-          if (_customerArrived)
+          if (hasArrived)
             Column(
               children: [
                 Text(
@@ -924,43 +995,39 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                 const SizedBox(height: Dimensions.paddingSizeSmall),
               ],
             ),
-          if (isWaiting)
-            CustomButtonWidget(
-              buttonText: 'Cliente não respondeu',
-              onPressed: _customerNoResponseReported
-                  ? null
-                  : () {
-                      setState(() {
-                        _customerNoResponseReported = true;
-                      });
-                    },
-              transparent: _customerNoResponseReported,
-              isBorder: true,
-              fontColor: Theme.of(context).textTheme.bodyLarge?.color,
-            ),
-          if (isWaiting) const SizedBox(height: Dimensions.paddingSizeSmall),
           if (canFinalize)
-            CustomButtonWidget(
-              buttonText: 'Finalizar como não encontrado',
-              onPressed: () async {
-                final bool isWithinRadius = await _isWithinCustomerRadius(order);
-                if (isWithinRadius) {
-                  if (order.orderType == 'parcel') {
-                    showCustomBottomSheet(
-                      child: CancellationReasonBottomSheet(
-                        isBeforePickup: false,
-                        orderId: order.id!,
-                      ),
-                    );
-                  } else {
-                    Get.find<OrderController>().updateOrderStatus(
-                      order,
-                      AppConstants.failed,
-                      comment: 'Cliente não encontrado',
-                    );
-                  }
-                }
-              },
+            Column(
+              children: [
+                CustomButtonWidget(
+                  buttonText: 'Falar com suporte',
+                  onPressed: () {
+                    Get.toNamed(RouteHelper.getConversationListRoute());
+                  },
+                ),
+                const SizedBox(height: Dimensions.paddingSizeSmall),
+                CustomButtonWidget(
+                  buttonText: 'Cliente não encontrado',
+                  onPressed: () async {
+                    final bool isWithinRadius = await _isWithinCustomerRadius(order);
+                    if (isWithinRadius) {
+                      if (order.orderType == 'parcel') {
+                        showCustomBottomSheet(
+                          child: CancellationReasonBottomSheet(
+                            isBeforePickup: false,
+                            orderId: order.id!,
+                          ),
+                        );
+                      } else {
+                        Get.find<OrderController>().updateOrderStatus(
+                          order,
+                          AppConstants.failed,
+                          comment: 'Cliente não encontrado',
+                        );
+                      }
+                    }
+                  },
+                ),
+              ],
             ),
         ],
       ),

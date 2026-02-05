@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:io';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
+import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/features/disbursement/helper/disbursement_helper.dart';
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/helper/notification_helper.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/main.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
+import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_alert_dialog_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/features/dashboard/widgets/bottom_nav_item_widget.dart';
@@ -92,6 +94,10 @@ class DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _navigateRequestPage() {
+    if (_hasPendingReturnOrFailed()) {
+      showCustomSnackBar('Você possui uma devolução ou falha pendente. Finalize antes de receber novos pedidos.');
+      return;
+    }
     if(Get.find<ProfileController>().profileModel != null && Get.find<ProfileController>().profileModel!.active == 1
         && Get.find<OrderController>().currentOrderList != null && Get.find<OrderController>().currentOrderList!.isEmpty) {
       _setPage(1);
@@ -213,6 +219,11 @@ class DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
+    if (_hasPendingReturnOrFailed()) {
+      showCustomSnackBar('Você possui uma devolução ou falha pendente. Finalize antes de ficar Online.');
+      return;
+    }
+
     final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       showCustomSnackBar('Ative o GPS para ficar Online.');
@@ -241,5 +252,17 @@ class DashboardScreenState extends State<DashboardScreen> {
     }
 
     await profileController.updateActiveStatus();
+  }
+
+  bool _hasPendingReturnOrFailed() {
+    final List<OrderModel>? orders = Get.find<OrderController>().currentOrderList;
+    if (orders == null) {
+      return false;
+    }
+    return orders.any((order) {
+      final bool isReturn = order.orderType == 'parcel' && order.orderStatus == AppConstants.returned;
+      final bool isFailed = order.orderStatus == AppConstants.failed;
+      return isReturn || isFailed;
+    });
   }
 }
