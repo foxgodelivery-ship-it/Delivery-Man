@@ -19,10 +19,14 @@ import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_app_bar_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_image_widget.dart';
+import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/order_item_widget.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/info_card_widget.dart';
+import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final int? orderId;
@@ -39,6 +43,14 @@ class OrderDetailsScreen extends StatefulWidget {
 
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBindingObserver {
   Timer? _timer;
+  Timer? _customerWaitTimer;
+  int _waitSecondsRemaining = 0;
+  bool _customerArrived = false;
+  bool _customerNoResponseReported = false;
+  int? _trackedOrderId;
+  String? _trackedOrderStatus;
+  static const int _waitDurationSeconds = 300;
+  static const double _arrivalRadiusMeters = 80;
 
   void _startApiCalling(){
     _timer?.cancel();
@@ -79,6 +91,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
     _timer?.cancel();
+    _customerWaitTimer?.cancel();
   }
 
   @override
@@ -107,6 +120,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
           child: GetBuilder<OrderController>(builder: (orderController) {
 
             OrderModel? controllerOrderModel = orderController.orderModel;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _syncCustomerWaitState(controllerOrderModel);
+              }
+            });
 
             bool restConfModel = Get.find<SplashController>().configModel!.orderConfirmationModel != 'deliveryman';
 
@@ -730,6 +748,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                 ]),
               )),
 
+              _buildCustomerArrivalSection(controllerOrderModel),
+              _buildReturnNavigationSection(controllerOrderModel),
+
               parcel ? ParcelBottomView(
                 orderController: orderController, controllerOrderModel: controllerOrderModel, orderId: widget.orderId!,
                 fromLocationScreen: widget.fromLocationScreen, showDeliveryConfirmImage: showDeliveryConfirmImage,
@@ -771,4 +792,195 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       );
     },
   );
+
+  void _syncCustomerWaitState(OrderModel? order) {
+    final currentId = order?.id;
+    final currentStatus = order?.orderStatus;
+    if (_trackedOrderId != currentId || _trackedOrderStatus != currentStatus) {
+      _trackedOrderId = currentId;
+      _trackedOrderStatus = currentStatus;
+      if (currentStatus != AppConstants.pickedUp) {
+        _stopCustomerWaitTimer();
+      }
+    }
+  }
+
+  void _startCustomerWaitTimer() {
+    _customerWaitTimer?.cancel();
+    setState(() {
+      _waitSecondsRemaining = _waitDurationSeconds;
+    });
+    _customerWaitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_waitSecondsRemaining <= 1) {
+        timer.cancel();
+        setState(() {
+          _waitSecondsRemaining = 0;
+        });
+      } else {
+        setState(() {
+          _waitSecondsRemaining = _waitSecondsRemaining - 1;
+        });
+      }
+    });
+  }
+
+  void _stopCustomerWaitTimer() {
+    _customerWaitTimer?.cancel();
+    _customerWaitTimer = null;
+    if (mounted) {
+      setState(() {
+        _waitSecondsRemaining = 0;
+        _customerArrived = false;
+        _customerNoResponseReported = false;
+      });
+    }
+  }
+
+  String _formatWaitTime(int seconds) {
+    final int minutes = seconds ~/ 60;
+    final int remainderSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainderSeconds.toString().padLeft(2, '0')}';
+  }
+
+  Future<bool> _isWithinCustomerRadius(OrderModel order) async {
+    final String? latitude = order.orderType == 'parcel'
+        ? order.receiverDetails?.latitude
+        : order.deliveryAddress?.latitude;
+    final String? longitude = order.orderType == 'parcel'
+        ? order.receiverDetails?.longitude
+        : order.deliveryAddress?.longitude;
+
+    final double? customerLat = double.tryParse(latitude ?? '');
+    final double? customerLng = double.tryParse(longitude ?? '');
+    if (customerLat == null || customerLng == null) {
+      showCustomSnackBar('Não foi possível obter a localização do cliente.');
+      return false;
+    }
+
+    try {
+      final Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final double distance = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        customerLat,
+        customerLng,
+      );
+      if (distance > _arrivalRadiusMeters) {
+        showCustomSnackBar('Você precisa estar próximo do endereço para confirmar chegada.');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      showCustomSnackBar('Não foi possível obter sua localização.');
+      return false;
+    }
+  }
+
+  Widget _buildCustomerArrivalSection(OrderModel order) {
+    final bool isPickedUp = order.orderStatus == AppConstants.pickedUp;
+    if (!isPickedUp) {
+      return const SizedBox();
+    }
+
+    final bool isWaiting = _customerArrived && _waitSecondsRemaining > 0;
+    final bool canFinalize = _customerArrived && _waitSecondsRemaining == 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5, spreadRadius: 1)],
+      ),
+      child: Column(
+        children: [
+          if (!_customerArrived)
+            CustomButtonWidget(
+              buttonText: 'Cheguei no cliente',
+              onPressed: () async {
+                final bool isWithinRadius = await _isWithinCustomerRadius(order);
+                if (isWithinRadius) {
+                  setState(() {
+                    _customerArrived = true;
+                    _customerNoResponseReported = false;
+                  });
+                  _startCustomerWaitTimer();
+                }
+              },
+            ),
+          if (_customerArrived)
+            Column(
+              children: [
+                Text(
+                  'Aguardando cliente: ${_formatWaitTime(_waitSecondsRemaining)}',
+                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall),
+                ),
+                const SizedBox(height: Dimensions.paddingSizeSmall),
+              ],
+            ),
+          if (isWaiting)
+            CustomButtonWidget(
+              buttonText: 'Cliente não respondeu',
+              onPressed: _customerNoResponseReported
+                  ? null
+                  : () {
+                      setState(() {
+                        _customerNoResponseReported = true;
+                      });
+                    },
+              transparent: _customerNoResponseReported,
+              isBorder: true,
+              fontColor: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          if (isWaiting) const SizedBox(height: Dimensions.paddingSizeSmall),
+          if (canFinalize)
+            CustomButtonWidget(
+              buttonText: 'Finalizar como não encontrado',
+              onPressed: () async {
+                final bool isWithinRadius = await _isWithinCustomerRadius(order);
+                if (isWithinRadius) {
+                  final String status = order.orderType == 'parcel' ? AppConstants.returned : AppConstants.failed;
+                  Get.find<OrderController>().updateOrderStatus(
+                    order,
+                    status,
+                    comment: 'Cliente não encontrado',
+                  );
+                }
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReturnNavigationSection(OrderModel order) {
+    final bool isReturnFlow = order.orderStatus == AppConstants.failed || order.orderStatus == AppConstants.returned;
+    if (!isReturnFlow || order.storeLat == null || order.storeLng == null) {
+      return const SizedBox();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5, spreadRadius: 1)],
+      ),
+      child: CustomButtonWidget(
+        buttonText: 'Navegar para devolução (Loja)',
+        onPressed: () async {
+          final String url = 'https://www.google.com/maps/dir/?api=1&destination=${order.storeLat},${order.storeLng}&mode=d';
+          if (await canLaunchUrlString(url)) {
+            await launchUrlString(url, mode: LaunchMode.externalApplication);
+          } else {
+            showCustomSnackBar('${'could_not_launch'.tr} $url');
+          }
+        },
+      ),
+    );
+  }
 }
