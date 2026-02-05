@@ -29,7 +29,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher_string.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final int? orderId;
@@ -873,9 +872,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   void _clearCustomerWaitState({int? orderId}) {
     _customerWaitTimer?.cancel();
     _customerWaitTimer = null;
-    if (orderId != null) {
-      Get.find<SharedPreferences>().remove(_arrivalKey(orderId));
-    }
     if (mounted) {
       setState(() {
         _waitSecondsRemaining = 0;
@@ -886,16 +882,25 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   }
 
   void _loadArrivalState(OrderModel order) {
-    if (_arrivalLoadedOrderId == order.id) {
-      return;
+    final String? pickedUpAt = order.updatedAt;
+    DateTime? parsed;
+    if (pickedUpAt != null) {
+      try {
+        parsed = DateConverterHelper.dateTimeStringToDate(pickedUpAt);
+      } catch (_) {
+        parsed = null;
+      }
     }
 
-    _arrivalLoadedOrderId = order.id;
-    final String? stored = Get.find<SharedPreferences>().getString(_arrivalKey(order.id!));
-    final DateTime? parsed = stored != null ? DateTime.tryParse(stored) : null;
     if (parsed != null) {
+      final bool shouldUpdate = _arrivalLoadedOrderId != order.id || _arrivedAt == null || !_arrivedAt!.isAtSameMomentAs(parsed);
+      if (!shouldUpdate) {
+        return;
+      }
+
       setState(() {
         _arrivedAt = parsed;
+        _arrivalLoadedOrderId = order.id;
         _waitSecondsRemaining = _calculateRemainingSeconds();
       });
       if (_waitSecondsRemaining > 0) {
@@ -908,8 +913,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       });
     }
   }
-
-  String _arrivalKey(int orderId) => '${AppConstants.customerArrivedAtPrefix}$orderId';
 
   String _formatWaitTime(int seconds) {
     final int minutes = seconds ~/ 60;
@@ -975,13 +978,32 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
               onPressed: () async {
                 final bool isWithinRadius = await _isWithinCustomerRadius(order);
                 if (isWithinRadius) {
-                  final DateTime arrivedAt = DateTime.now().add(_serverTimeOffset);
-                  await Get.find<SharedPreferences>().setString(_arrivalKey(order.id!), arrivedAt.toIso8601String());
+                  final String? pickedUpAt = order.updatedAt;
+                  if (pickedUpAt == null) {
+                    showCustomSnackBar('Não foi possível obter o horário do servidor.');
+                    return;
+                  }
+
+                  DateTime? arrivedAt;
+                  try {
+                    arrivedAt = DateConverterHelper.dateTimeStringToDate(pickedUpAt);
+                  } catch (_) {
+                    arrivedAt = null;
+                  }
+
+                  if (arrivedAt == null) {
+                    showCustomSnackBar('Não foi possível obter o horário do servidor.');
+                    return;
+                  }
+
                   setState(() {
                     _arrivedAt = arrivedAt;
                     _arrivalLoadedOrderId = order.id;
+                    _waitSecondsRemaining = _calculateRemainingSeconds();
                   });
-                  _startCustomerWaitTimer();
+                  if (_waitSecondsRemaining > 0) {
+                    _startCustomerWaitTimer();
+                  }
                 }
               },
             ),
