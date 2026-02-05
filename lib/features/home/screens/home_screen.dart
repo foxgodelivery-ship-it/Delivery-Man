@@ -155,10 +155,13 @@ class _HomeScreenState extends State<HomeScreen> {
         surfaceTintColor: Theme.of(context).cardColor,
         shadowColor: Theme.of(context).disabledColor.withValues(alpha: 0.5),
         elevation: 2,
-        leading: Padding(
-          padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-          child: Image.asset(Images.logo, height: 30, width: 30),
-        ),
+        leading: Builder(builder: (context) {
+          return IconButton(
+            icon: Icon(Icons.menu, color: Theme.of(context).textTheme.bodyLarge!.color),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            tooltip: 'Menu',
+          );
+        }),
         titleSpacing: 0,
         title: Text(AppConstants.appName, maxLines: 1, overflow: TextOverflow.ellipsis, style: robotoMedium.copyWith(
           color: Theme.of(context).textTheme.bodyLarge!.color, fontSize: Dimensions.fontSizeDefault,
@@ -185,12 +188,144 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: Dimensions.paddingSizeSmall),
         ],
       ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(color: Theme.of(context).primaryColor),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Image.asset(Images.logo, height: 40, width: 40),
+                  const SizedBox(height: Dimensions.paddingSizeSmall),
+                  Text(AppConstants.appName, style: robotoMedium.copyWith(color: Colors.white)),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home_outlined),
+              title: const Text('Início'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getMainRoute('home'));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.assignment_outlined),
+              title: const Text('Solicitações'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getMainRoute('order-request'));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.shopping_bag_outlined),
+              title: const Text('Pedidos'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getMainRoute('order'));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.notifications_outlined),
+              title: const Text('Notificações'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getNotificationRoute());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('Conversas'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getConversationListRoute());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_circle_outlined),
+              title: const Text('Conta'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getMainRoute('profile'));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet_outlined),
+              title: const Text('Ganhos'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getMyEarningRoute());
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('Termos e condições'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getTermsRoute());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: const Text('Política de privacidade'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getPrivacyRoute());
+              },
+            ),
+          ],
+        ),
+      ),
 
       body: RefreshIndicator(
         onRefresh: () async {
           return await _loadData();
         },
         child: Column(children: [
+          GetBuilder<ProfileController>(builder: (profileController) {
+            final bool isOnline = profileController.profileModel?.active == 1;
+            return Container(
+              width: double.infinity,
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.08),
+              padding: const EdgeInsets.symmetric(
+                horizontal: Dimensions.paddingSizeDefault,
+                vertical: Dimensions.paddingSizeSmall,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        height: 10,
+                        width: 10,
+                        decoration: BoxDecoration(
+                          color: isOnline ? Colors.green : Colors.grey,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: Dimensions.paddingSizeSmall),
+                      Text(
+                        isOnline ? 'Online' : 'Offline',
+                        style: robotoMedium.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color),
+                      ),
+                    ],
+                  ),
+                  if (isOnline)
+                    Padding(
+                      padding: const EdgeInsets.only(top: Dimensions.paddingSizeExtraSmall),
+                      child: Text(
+                        'Buscando serviços...',
+                        style: robotoRegular.copyWith(color: Theme.of(context).textTheme.bodyMedium!.color),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }),
 
           if(!_isNotificationPermissionGranted)
             permissionWarning(isBatteryPermission: false, onTap: requestNotificationPermission, closeOnTap: () {
