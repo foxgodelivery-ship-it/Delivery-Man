@@ -48,6 +48,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   Timer? _customerWaitTimer;
   int _waitSecondsRemaining = 0;
   DateTime? _arrivedAt;
+  int? _arrivalLoadedOrderId;
   int? _trackedOrderId;
   String? _trackedOrderStatus;
   String? _serverTimestampReference;
@@ -806,14 +807,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     if (_trackedOrderId != currentId || _trackedOrderStatus != currentStatus) {
       _trackedOrderId = currentId;
       _trackedOrderStatus = currentStatus;
-      if (currentStatus != AppConstants.pickedUp) {
-        _clearCustomerWaitState();
-      } else if (order != null) {
-        _setArrivalFromServer(order);
-      }
-    } else if (currentStatus == AppConstants.pickedUp && order != null) {
-      _setArrivalFromServer(order);
     }
+    _loadArrivalState(order);
   }
 
   void _updateServerTimeReference(OrderModel? order) {
@@ -889,36 +884,48 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       setState(() {
         _waitSecondsRemaining = 0;
         _arrivedAt = null;
+        _arrivalLoadedOrderId = null;
       });
     }
   }
 
-  void _setArrivalFromServer(OrderModel order) {
-    DateTime? parsed;
+  DateTime? _getArrivalFromServer(OrderModel order) {
     if (order.orderStatus == AppConstants.pickedUp && order.updatedAt != null) {
       try {
-        parsed = DateConverterHelper.dateTimeStringToDate(order.updatedAt!);
+        return DateConverterHelper.dateTimeStringToDate(order.updatedAt!);
       } catch (_) {
-        parsed = null;
+        return null;
       }
     }
+    return null;
+  }
 
-    if (parsed != null) {
-      final bool shouldUpdate = _arrivalLoadedOrderId != order.id || _arrivedAt == null || !_arrivedAt!.isAtSameMomentAs(parsed);
-      if (!shouldUpdate) {
-        return;
-      }
+  void _loadArrivalState(OrderModel? order) {
+    if (order == null || order.orderStatus != AppConstants.pickedUp) {
+      _clearCustomerWaitState();
+      return;
+    }
 
-      setState(() {
-        _arrivedAt = parsed;
-        _arrivalLoadedOrderId = order.id;
-        _waitSecondsRemaining = _calculateRemainingSeconds();
-      });
-      if (_waitSecondsRemaining > 0) {
-        _startCustomerWaitTimer();
-      }
-    } else {
-      _customerWaitTimer?.cancel();
+    final DateTime? arrivedAt = _getArrivalFromServer(order);
+    if (arrivedAt == null) {
+      _clearCustomerWaitState();
+      return;
+    }
+
+    final bool shouldUpdate = _arrivalLoadedOrderId != order.id ||
+        _arrivedAt == null ||
+        !_arrivedAt!.isAtSameMomentAs(arrivedAt);
+    if (!shouldUpdate) {
+      return;
+    }
+
+    setState(() {
+      _arrivedAt = arrivedAt;
+      _arrivalLoadedOrderId = order.id;
+      _waitSecondsRemaining = _calculateRemainingSeconds();
+    });
+    if (_waitSecondsRemaining > 0) {
+      _startCustomerWaitTimer();
     }
   }
 
@@ -986,19 +993,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
               onPressed: () async {
                 final bool isWithinRadius = await _isWithinCustomerRadius(order);
                 if (isWithinRadius) {
-                  final String? updatedAt = order.updatedAt;
-                  if (updatedAt == null) {
-                    showCustomSnackBar('Não foi possível obter o horário do servidor.');
-                    return;
-                  }
-
-                  DateTime? arrivedAt;
-                  try {
-                    arrivedAt = DateConverterHelper.dateTimeStringToDate(updatedAt);
-                  } catch (_) {
-                    arrivedAt = null;
-                  }
-
+                  final DateTime? arrivedAt = _getArrivalFromServer(order);
                   if (arrivedAt == null) {
                     showCustomSnackBar('Não foi possível obter o horário do servidor.');
                     return;
