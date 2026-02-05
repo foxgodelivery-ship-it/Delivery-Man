@@ -6,8 +6,6 @@ import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_confirmation_bottom_sheet.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/home/widgets/location_access_dialog.dart';
-import 'package:sixam_mart_delivery/features/language/controllers/language_controller.dart';
-import 'package:sixam_mart_delivery/features/language/widgets/language_bottom_sheet_widget.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/features/profile/widgets/notification_status_change_bottom_sheet.dart';
@@ -295,11 +293,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               }),
               const SizedBox(height: Dimensions.paddingSizeSmall),
 
-              ProfileButtonWidget(iconImage: Images.translation, title: 'language'.tr, onTap: () {
-                _manageLanguageFunctionality();
-              }),
-              const SizedBox(height: Dimensions.paddingSizeSmall),
-
               ProfileButtonWidget(iconImage: Images.editUser, title: 'edit_profile'.tr, onTap: () {
                 Get.toNamed(RouteHelper.getUpdateProfileRoute());
               }),
@@ -475,25 +468,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         style: robotoRegular,
       ),
     );
-  }
-
-  void _manageLanguageFunctionality() {
-    Get.find<LocalizationController>().saveCacheLanguage(null);
-    Get.find<LocalizationController>().searchSelectedLanguage();
-
-    showModalBottomSheet(
-      isScrollControlled: true, useRootNavigator: true, context: Get.context!,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(Dimensions.radiusExtraLarge), topRight: Radius.circular(Dimensions.radiusExtraLarge)),
-      ),
-      builder: (context) {
-        return ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
-          child: const LanguageBottomSheetWidget(),
-        );
-      },
-    ).then((value) => Get.find<LocalizationController>().setLanguage(Get.find<LocalizationController>().getCacheLocaleFromSharedPref()));
   }
 
   void _checkPermission(Function callback) async {
