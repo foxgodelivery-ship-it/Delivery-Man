@@ -77,7 +77,7 @@ class InfoCardWidget extends StatelessWidget {
 
             showButton ? Row(children: [
 
-              (showCallButton && phone != null && phone!.isNotEmpty) ? TextButton.icon(
+              (isStore && showCallButton && phone != null && phone!.isNotEmpty) ? TextButton.icon(
                 onPressed: () async {
                   if(await canLaunchUrlString('tel:$phone')) {
                     launchUrlString('tel:$phone', mode: LaunchMode.externalApplication);

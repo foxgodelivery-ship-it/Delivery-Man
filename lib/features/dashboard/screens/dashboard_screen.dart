@@ -93,9 +93,10 @@ class DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _navigateRequestPage() {
-    if (_hasPendingReturnOrFailed()) {
-      showCustomSnackBar('Você possui uma devolução ou falha pendente. Finalize antes de receber novos pedidos.');
+  Future<void> _navigateRequestPage() async {
+    final bool hasPendingReturn = await _hasPendingParcelReturn();
+    if (hasPendingReturn) {
+      showCustomSnackBar('Você possui devolução pendente. Finalize a devolução antes de receber novos pedidos.');
       return;
     }
     if(Get.find<ProfileController>().profileModel != null && Get.find<ProfileController>().profileModel!.active == 1
@@ -219,8 +220,9 @@ class DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    if (_hasPendingReturnOrFailed()) {
-      showCustomSnackBar('Você possui uma devolução ou falha pendente. Finalize antes de ficar Online.');
+    final bool hasPendingReturn = await _hasPendingParcelReturn();
+    if (hasPendingReturn) {
+      showCustomSnackBar('Você possui devolução pendente. Finalize a devolução antes de ficar Online.');
       return;
     }
 
@@ -254,17 +256,18 @@ class DashboardScreenState extends State<DashboardScreen> {
     await profileController.updateActiveStatus();
   }
 
-  bool _hasPendingReturnOrFailed() {
-    final List<OrderModel>? orders = Get.find<OrderController>().currentOrderList;
+  Future<bool> _hasPendingParcelReturn() async {
+    final OrderController orderController = Get.find<OrderController>();
+    await orderController.getCompletedOrders(1, willUpdate: false);
+    final List<OrderModel>? orders = orderController.completedOrderList;
     if (orders == null) {
       return false;
     }
     return orders.any((order) {
-      final bool isReturn = order.orderType == 'parcel'
-          && (order.orderStatus == AppConstants.returned
-              || (order.orderStatus == AppConstants.canceled && order.parcelCancellation?.beforePickup != 1));
-      final bool isFailed = order.orderStatus == AppConstants.failed;
-      return isReturn || isFailed;
+      return order.orderType == 'parcel'
+          && order.orderStatus == AppConstants.canceled
+          && order.parcelCancellation != null
+          && order.parcelCancellation?.beforePickup != 1;
     });
   }
 }
