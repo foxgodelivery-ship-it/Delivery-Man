@@ -260,7 +260,9 @@ class DashboardScreenState extends State<DashboardScreen> {
       return false;
     }
     return orders.any((order) {
-      final bool isReturn = order.orderType == 'parcel' && order.orderStatus == AppConstants.returned;
+      final bool isReturn = order.orderType == 'parcel'
+          && (order.orderStatus == AppConstants.returned
+              || (order.orderStatus == AppConstants.canceled && order.parcelCancellation?.beforePickup != 1));
       final bool isFailed = order.orderStatus == AppConstants.failed;
       return isReturn || isFailed;
     });

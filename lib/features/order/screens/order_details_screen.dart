@@ -197,6 +197,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
             }
             final bool hasPickedUp = controllerOrderModel?.orderStatus == 'picked_up';
             final bool canChatCustomer = showChatPermission && hasPickedUp && controllerOrderModel?.customer != null;
+            final bool isWaitingForCustomer = hasPickedUp && _arrivedAt != null && _waitSecondsRemaining > 0;
 
             return (orderController.orderDetailsModel != null && controllerOrderModel != null) ? Column(children: [
 
@@ -756,13 +757,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
               _buildCustomerArrivalSection(controllerOrderModel),
               _buildReturnNavigationSection(controllerOrderModel),
 
-              parcel ? ParcelBottomView(
+              isWaitingForCustomer ? const SizedBox() : (parcel ? ParcelBottomView(
                 orderController: orderController, controllerOrderModel: controllerOrderModel, orderId: widget.orderId!,
                 fromLocationScreen: widget.fromLocationScreen, showDeliveryConfirmImage: showDeliveryConfirmImage,
               ) : RegularOrderBottomView(
                 orderController: orderController, controllerOrderModel: controllerOrderModel, fromLocationScreen: widget.fromLocationScreen,
                 orderId: widget.orderId!, showDeliveryConfirmImage: showDeliveryConfirmImage,
-              ),
+              )),
 
             ]) : const Center(child: CircularProgressIndicator());
           }),
@@ -812,6 +813,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   }
 
   void _updateServerTimeReference(OrderModel? order) {
+    if (order == null || order.orderStatus != AppConstants.pickedUp) {
+      _serverReferenceTime = null;
+      _localReferenceTime = null;
+      _serverTimestampReference = null;
+      return;
+    }
     final String? updatedAt = order?.updatedAt;
     if (updatedAt == null || updatedAt == _serverTimestampReference) {
       return;
@@ -976,6 +983,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     }
 
     final bool hasArrived = _arrivedAt != null;
+    final bool waitingActive = hasArrived && _waitSecondsRemaining > 0;
     final bool canFinalize = hasArrived && _waitSecondsRemaining == 0;
 
     return Container(
@@ -1010,7 +1018,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                 }
               },
             ),
-          if (hasArrived)
+          if (waitingActive)
             Column(
               children: [
                 Text(
@@ -1060,7 +1068,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   }
 
   Widget _buildReturnNavigationSection(OrderModel order) {
-    final bool isReturnFlow = order.orderStatus == AppConstants.failed || order.orderStatus == AppConstants.returned;
+    final bool isParcelReturnPending = order.orderType == 'parcel'
+        && order.orderStatus == AppConstants.canceled
+        && order.parcelCancellation?.beforePickup != 1;
+    final bool isReturnFlow = order.orderStatus == AppConstants.failed
+        || order.orderStatus == AppConstants.returned
+        || isParcelReturnPending;
     if (!isReturnFlow || order.storeLat == null || order.storeLng == null) {
       return const SizedBox();
     }
