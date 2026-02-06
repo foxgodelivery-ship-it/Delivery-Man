@@ -431,27 +431,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text('Fox Entregador', maxLines: 1, overflow: TextOverflow.ellipsis, style: robotoMedium.copyWith(
           color: Theme.of(context).textTheme.bodyLarge!.color, fontSize: Dimensions.fontSizeDefault,
         )),
-        actions: [
-          IconButton(
-            icon: GetBuilder<NotificationController>(builder: (notificationController) {
-              return Stack(children: [
 
-                Icon(Icons.notifications, size: 25, color: Theme.of(context).textTheme.bodyLarge!.color),
-
-                notificationController.hasNotification ? Positioned(top: 0, right: 0, child: Container(
-                  height: 10, width: 10, decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.error, shape: BoxShape.circle,
-                  border: Border.all(width: 1, color: Theme.of(context).cardColor),
-                ),
-                )) : const SizedBox(),
-
-              ]);
-            }),
-            onPressed: () => Get.toNamed(RouteHelper.getNotificationRoute()),
-          ),
-
-          const SizedBox(width: Dimensions.paddingSizeSmall),
-        ],
       ),
       drawer: Drawer(
         child: ListView(
