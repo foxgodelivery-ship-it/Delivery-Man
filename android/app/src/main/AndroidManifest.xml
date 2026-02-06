@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.foxgodelivery.deliveryman"
-    xmlns:tools="http://schemas.android.com/tools">
+>
     <!-- io.flutter.app.FlutterApplication is an android.app.Application that
          calls FlutterMain.startInitialization(this); in its onCreate method.
          In most cases you can leave this as-is, but you if you want to provide
@@ -36,7 +36,6 @@
     </queries>
 
     <application
-        tools:replace="android:label"
         android:label="Fox Entregador"
         android:name="${applicationName}"
         android:extractNativeLibs="true"
