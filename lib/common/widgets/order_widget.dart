@@ -18,9 +18,71 @@ class OrderWidget extends StatelessWidget {
   final double cardWidth;
   const OrderWidget({super.key, required this.orderModel, required this.isRunningOrder, required this.orderIndex, required this.cardWidth});
 
+  bool _isValidValue(String? value) => value != null && value.trim().isNotEmpty;
+
+  String _addressNumber(DeliveryAddress? address) {
+    if (address == null) {
+      return '';
+    }
+    if (_isValidValue(address.house)) {
+      return address.house!.trim();
+    }
+    if (_isValidValue(address.streetNumber)) {
+      return address.streetNumber!.trim();
+    }
+    return '';
+  }
+
+  String _formatAddress(DeliveryAddress? address) {
+    if(address == null) {
+      return '';
+    }
+    final List<String> parts = [];
+    if(_isValidValue(address.address)) {
+      parts.add(address.address!.trim());
+    }
+    final String number = _addressNumber(address);
+    if (number.isNotEmpty) {
+      parts.add(number);
+    }
+    if(_isValidValue(address.floor)) {
+      parts.add(address.floor!.trim());
+    }
+    return parts.join(', ');
+  }
+
+  Future<void> _openNavigation({
+    required String? latitude,
+    required String? longitude,
+    required String? fallbackAddress,
+  }) async {
+    final bool hasCoordinates = _isValidValue(latitude) && _isValidValue(longitude) && latitude != '0' && longitude != '0';
+    final String destination = hasCoordinates
+        ? '${latitude!},${longitude!}'
+        : Uri.encodeComponent(fallbackAddress ?? '');
+    if(destination.isEmpty) {
+      showCustomSnackBar('address_not_found'.tr);
+      return;
+    }
+    final String url = 'https://www.google.com/maps/dir/?api=1&destination=$destination&mode=d';
+    if (await canLaunchUrlString(url)) {
+      await launchUrlString(url, mode: LaunchMode.externalApplication);
+    } else {
+      showCustomSnackBar('${'could_not_launch'.tr} $url');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     bool parcel = orderModel.orderType == 'parcel';
+    final String pickupAddress = parcel
+        ? _formatAddress(orderModel.deliveryAddress)
+        : (orderModel.storeAddress ?? '');
+    final String deliveryAddress = parcel
+        ? _formatAddress(orderModel.receiverDetails)
+        : _formatAddress(orderModel.deliveryAddress);
+    final String pickupAddressText = pickupAddress.isNotEmpty ? pickupAddress : 'address_not_found'.tr;
+    final String deliveryAddressText = deliveryAddress.isNotEmpty ? deliveryAddress : 'address_not_found'.tr;
 
     return InkWell(
       onTap: () {
@@ -85,7 +147,7 @@ class OrderWidget extends StatelessWidget {
 
                 Expanded(
                   child: Text(
-                    parcel ? 'customer_location'.tr : (parcel && orderModel.orderStatus == 'picked_up') ? 'receiver_location'.tr : orderModel.storeName?? 'store_not_found'.tr,
+                    parcel ? 'customer_location'.tr : orderModel.storeName?? 'store_not_found'.tr,
                     style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall),
                     maxLines: 1, overflow: TextOverflow.ellipsis,
                   ),
@@ -96,16 +158,22 @@ class OrderWidget extends StatelessWidget {
               ]),
               const SizedBox(height: Dimensions.paddingSizeSmall),
 
-              Row(crossAxisAlignment: CrossAxisAlignment.center, mainAxisAlignment: MainAxisAlignment.start, children: [
-                Icon(Icons.location_on, size: 20, color: Theme.of(context).hintColor),
-                const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                Expanded(child: Text(
-                  (parcel && orderModel.orderStatus != 'picked_up') ? orderModel.deliveryAddress!.address.toString() : (parcel && orderModel.orderStatus == 'picked_up') ? orderModel.receiverDetails!.address.toString() : orderModel.storeAddress ?? 'address_not_found'.tr,
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('RETIRADA', style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall)),
+                const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                Text(
+                  pickupAddressText,
                   style: robotoRegular.copyWith(color: Theme.of(context).hintColor, fontSize: Dimensions.fontSizeSmall),
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                )),
-                const SizedBox(width: Dimensions.paddingSizeExtraSmall),
+                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: Dimensions.paddingSizeSmall),
+                Text('ENTREGA', style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall)),
+                const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                Text(
+                  deliveryAddressText,
+                  style: robotoRegular.copyWith(color: Theme.of(context).hintColor, fontSize: Dimensions.fontSizeSmall),
+                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                ),
               ]),
               const SizedBox(height: Dimensions.paddingSizeSmall),
 
@@ -121,71 +189,80 @@ class OrderWidget extends StatelessWidget {
                 bottomLeft: Radius.circular(Dimensions.radiusDefault), bottomRight: Radius.circular(Dimensions.radiusDefault),
               ),
             ),
-            child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-              TextButton(
-                onPressed: () {
-                  Get.toNamed(
-                    RouteHelper.getOrderDetailsRoute(orderModel.id),
-                    arguments: OrderDetailsScreen(orderId: orderModel.id, isRunningOrder: isRunningOrder, orderIndex: orderIndex),
-                  );
-                },
-                style: TextButton.styleFrom(
-                  backgroundColor: Theme.of(context).cardColor,
-                  minimumSize: Size(100, 35),
-                  padding: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                    side: BorderSide(color: Theme.of(context).disabledColor.withValues(alpha: 0.3)),
+            child: Column(children: [
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                TextButton(
+                  onPressed: () {
+                    Get.toNamed(
+                      RouteHelper.getOrderDetailsRoute(orderModel.id),
+                      arguments: OrderDetailsScreen(orderId: orderModel.id, isRunningOrder: isRunningOrder, orderIndex: orderIndex),
+                    );
+                  },
+                  style: TextButton.styleFrom(
+                    backgroundColor: Theme.of(context).cardColor,
+                    minimumSize: const Size(100, 35),
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                      side: BorderSide(color: Theme.of(context).disabledColor.withValues(alpha: 0.3)),
+                    ),
+                  ),
+                  child: Text(
+                    'details'.tr,
+                    style: robotoMedium.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color, fontSize: Dimensions.fontSizeSmall),
                   ),
                 ),
-                child: Text(
-                  'details'.tr,
-                  style: robotoMedium.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color, fontSize: Dimensions.fontSizeSmall),
-                ),
-              ),
-              const SizedBox(width: 16.0),
-
-              TextButton(
-                onPressed: () async {
-                  String url;
-                  if(parcel && (orderModel.orderStatus == 'picked_up')) {
-                    url = 'https://www.google.com/maps/dir/?api=1&destination=${orderModel.receiverDetails!.latitude}'
-                        ',${orderModel.receiverDetails!.longitude}&mode=d';
-                  }else if(parcel) {
-                    url = 'https://www.google.com/maps/dir/?api=1&destination=${orderModel.deliveryAddress!.latitude}'
-                        ',${orderModel.deliveryAddress!.longitude}&mode=d';
-                  }else if(orderModel.orderStatus == 'picked_up') {
-                    url = 'https://www.google.com/maps/dir/?api=1&destination=${orderModel.deliveryAddress!.latitude}'
-                        ',${orderModel.deliveryAddress!.longitude}&mode=d';
-                  }else {
-                    url = 'https://www.google.com/maps/dir/?api=1&destination=${orderModel.storeLat ?? '0'}'
-                        ',${orderModel.storeLng ?? '0'}&mode=d';
-                  }
-                  if (await canLaunchUrlString(url)) {
-                    await launchUrlString(url, mode: LaunchMode.externalApplication);
-                  } else {
-                    showCustomSnackBar('${'could_not_launch'.tr} $url');
-                  }
-                },
-                style: TextButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  minimumSize: Size(100, 35),
-                  padding: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                    side: BorderSide(color: Theme.of(context).disabledColor.withValues(alpha: 0.5)),
+              ]),
+              const SizedBox(height: Dimensions.paddingSizeSmall),
+              Row(children: [
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () => _openNavigation(
+                      latitude: parcel ? orderModel.deliveryAddress?.latitude : orderModel.storeLat,
+                      longitude: parcel ? orderModel.deliveryAddress?.longitude : orderModel.storeLng,
+                      fallbackAddress: pickupAddressText,
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: Theme.of(context).cardColor,
+                      minimumSize: const Size(100, 35),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                        side: BorderSide(color: Theme.of(context).disabledColor.withValues(alpha: 0.3)),
+                      ),
+                    ),
+                    icon: Icon(Icons.navigation, size: 16, color: Theme.of(context).primaryColor),
+                    label: Text(
+                      'Navegar para Loja',
+                      style: robotoMedium.copyWith(color: Theme.of(context).primaryColor, fontSize: Dimensions.fontSizeSmall),
+                    ),
                   ),
                 ),
-                child: Row(children: [
-                  Icon(Icons.directions, size: 16, color: Theme.of(context).cardColor),
-                  const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                  Text(
-                    'direction'.tr,
-                    style: robotoMedium.copyWith(color: Theme.of(context).cardColor, fontSize: Dimensions.fontSizeSmall),
+                const SizedBox(width: Dimensions.paddingSizeSmall),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () => _openNavigation(
+                      latitude: parcel ? orderModel.receiverDetails?.latitude : orderModel.deliveryAddress?.latitude,
+                      longitude: parcel ? orderModel.receiverDetails?.longitude : orderModel.deliveryAddress?.longitude,
+                      fallbackAddress: deliveryAddressText,
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor,
+                      minimumSize: const Size(100, 35),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                        side: BorderSide(color: Theme.of(context).disabledColor.withValues(alpha: 0.5)),
+                      ),
+                    ),
+                    icon: Icon(Icons.navigation, size: 16, color: Theme.of(context).cardColor),
+                    label: Text(
+                      'Navegar para Cliente',
+                      style: robotoMedium.copyWith(color: Theme.of(context).cardColor, fontSize: Dimensions.fontSizeSmall),
+                    ),
                   ),
-                ]),
-              ),
+                ),
+              ]),
             ]),
           ),
 

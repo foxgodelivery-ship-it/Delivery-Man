@@ -26,10 +26,10 @@ Future<void> main() async {
   if(GetPlatform.isAndroid) {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
-        apiKey: "AIzaSyCc3OCd5I2xSlnftZ4bFAbuCzMhgQHLivA",
-        appId: "1:491987943015:android:fe79b69339834d5c8f1ec2",
-        messagingSenderId: "491987943015",
-        projectId: "stackmart-500c7",
+        apiKey: 'AIzaSyBXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+        appId: '1:53725393548:android:88b22d15e688070250c1a9',
+        messagingSenderId: '53725393548',
+        projectId: 'foxgo-7218c',
       ),
     );
   }else {
@@ -90,7 +90,9 @@ class MyApp extends StatelessWidget {
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
             navigatorKey: Get.key,
-            theme: themeController.darkTheme ? dark : light,
+            theme: light,
+            darkTheme: dark,
+            themeMode: ThemeMode.system,
             locale: localizeController.locale,
             translations: Messages(languages: languages),
             fallbackLocale: Locale(AppConstants.languages[0].languageCode!, AppConstants.languages[0].countryCode),
