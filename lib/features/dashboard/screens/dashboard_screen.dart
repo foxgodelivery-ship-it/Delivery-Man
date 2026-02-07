@@ -222,10 +222,10 @@ class DashboardScreenState extends State<DashboardScreen> {
   int _findLatestOrderIndex(int? orderId) {
     final latest = Get.find<OrderController>().latestOrderList;
     if(latest == null || orderId == null) {
-      return 0;
+      return -1;
     }
     final index = latest.indexWhere((order) => order.id == orderId);
-    return index < 0 ? 0 : index;
+    return index;
   }
 
   void _setPage(int pageIndex) {
