@@ -215,7 +215,79 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
         print('Error setting markers: $e');
       }
     }
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<List<LatLng>> _resolveRoutePoints(List<LatLng> routeWaypoints) async {
+    if (routeWaypoints.length <= 1) {
+      return routeWaypoints;
+    }
+
+    final LatLng? routeOrigin = routeWaypoints.first;
+    final DateTime now = DateTime.now();
+    final bool isThrottleElapsed = _lastDirectionsFetchAt == null || now.difference(_lastDirectionsFetchAt!) >= _directionsThrottle;
+    final bool movedEnough = _lastDirectionsOrigin == null
+        || Geolocator.distanceBetween(
+              _lastDirectionsOrigin!.latitude,
+              _lastDirectionsOrigin!.longitude,
+              routeOrigin.latitude,
+              routeOrigin.longitude,
+            ) >=
+            _directionsMinMoveMeters;
+
+    if (!_isFetchingDirections && isThrottleElapsed && movedEnough) {
+      _isFetchingDirections = true;
+      _lastDirectionsFetchAt = now;
+      try {
+        final List<LatLng>? directions = await widget.orderController.getRouteDirections(waypoints: routeWaypoints);
+        if (directions != null && directions.length > 1) {
+          _lastDirectionsOrigin = routeOrigin;
+          return directions;
+        }
+      } catch (_) {
+      } finally {
+        _isFetchingDirections = false;
+      }
+    }
+
+    return routeWaypoints;
+  }
+
+  LatLngBounds _buildBounds(List<LatLng> points) {
+    if (points.isEmpty) {
+      return const LatLngBounds(
+        southwest: LatLng(-90, -180),
+        northeast: LatLng(90, 180),
+      );
+    }
+
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+
+    for (final point in points) {
+      minLat = min(minLat, point.latitude);
+      maxLat = max(maxLat, point.latitude);
+      minLng = min(minLng, point.longitude);
+      maxLng = max(maxLng, point.longitude);
+    }
+
+    if (minLat == maxLat) {
+      minLat -= 0.01;
+      maxLat += 0.01;
+    }
+    if (minLng == maxLng) {
+      minLng -= 0.01;
+      maxLng += 0.01;
+    }
+
+    return LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
   }
 
   LatLngBounds _buildBounds(List<LatLng> points) {
