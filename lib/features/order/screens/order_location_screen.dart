@@ -38,45 +38,6 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
   GoogleMapController? _controller;
   final Set<Marker> _markers = HashSet<Marker>();
   final Set<Polyline> _polylines = HashSet<Polyline>();
-  StreamSubscription<Position>? _positionSubscription;
-  LatLng? _currentLatLng;
-
-
-  @override
-  void initState() {
-    super.initState();
-    _initLiveLocation();
-  }
-
-  @override
-  void dispose() {
-    _positionSubscription?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _initLiveLocation() async {
-    try {
-      final Position current = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.bestForNavigation),
-      );
-      _currentLatLng = LatLng(current.latitude, current.longitude);
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (_) {}
-
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 5,
-      ),
-    ).listen((Position position) {
-      _currentLatLng = LatLng(position.latitude, position.longitude);
-      if (mounted) {
-        setMarkerAndRoute(widget.orderModel, widget.orderModel.orderType == 'parcel');
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +99,6 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
             onTap: widget.onTap,
             index: widget.index,
             fromNotification: widget.fromNotification,
-            currentLatLng: _currentLatLng,
           ),
         ),
 
@@ -150,8 +110,8 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
     if(_controller == null) {
       return;
     }
-    final lat = _currentLatLng?.latitude ?? Get.find<ProfileController>().recordLocationBody?.latitude;
-    final lng = _currentLatLng?.longitude ?? Get.find<ProfileController>().recordLocationBody?.longitude;
+    final lat = Get.find<ProfileController>().recordLocationBody?.latitude;
+    final lng = Get.find<ProfileController>().recordLocationBody?.longitude;
     if(lat != null && lng != null) {
       _controller!.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16));
     }
@@ -238,7 +198,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
           ));
         }
 
-        if (_currentLatLng != null || Get.find<ProfileController>().recordLocationBody != null) {
+        if (Get.find<ProfileController>().recordLocationBody != null) {
           _markers.add(Marker(
             markerId: const MarkerId('delivery_boy'),
             position: LatLng(deliveryManLat, deliveryManLng),
@@ -305,8 +265,6 @@ class _RoundMapButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   const _RoundMapButton({required this.icon, required this.onTap});
-
-
 
   @override
   Widget build(BuildContext context) {
