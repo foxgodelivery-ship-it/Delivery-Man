@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/fox_blue" />
-
+    <item android:drawable="@color/fox_blue"/>
     <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/launch_image" />
+        <bitmap android:gravity="center" android:src="@drawable/launch_image"/>
     </item>
 </layer-list>
