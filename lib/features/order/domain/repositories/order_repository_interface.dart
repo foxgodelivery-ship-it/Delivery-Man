@@ -1,3 +1,4 @@
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sixam_mart_delivery/api/api_client.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/ignore_model.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/parcel_cancellation_reasons_model.dart';
@@ -16,4 +17,5 @@ abstract class OrderRepositoryInterface implements RepositoryInterface {
   Future<ParcelCancellationReasonsModel?> getParcelCancellationReasons({required bool isBeforePickup});
   Future<bool> addParcelReturnDate({required int orderId, required String returnDate});
   Future<bool> submitParcelReturn({required int orderId, required String orderStatus, required int returnOtp});
+  Future<List<LatLng>?> getRouteDirections({required List<LatLng> waypoints});
 }

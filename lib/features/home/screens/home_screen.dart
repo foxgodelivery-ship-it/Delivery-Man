@@ -41,8 +41,11 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: _loadData,
         color: Theme.of(context).primaryColor,
-        child: Stack(
-          children: [
+        child: SizedBox(
+          height: media.size.height,
+          width: media.size.width,
+          child: Stack(
+            children: [
             // =================================================
             // 1. CABEÇALHO (HEADER) – cor primária do tema
             // =================================================
@@ -178,6 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // =================================================
             Positioned.fill(
               top: media.size.height * 0.42, // Começa abaixo do card de ganhos
+              bottom: 110 + media.padding.bottom,
               child: GetBuilder<ProfileController>(builder: (profileController) {
                 final profile = profileController.profileModel;
                 return GridView.count(
@@ -200,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // 4. BOTÃO GIGANTE (ONLINE/OFFLINE)
             // =================================================
             Positioned(
-              bottom: 30,
+              bottom: 20 + media.padding.bottom,
               left: 20,
               right: 20,
               child: GetBuilder<ProfileController>(builder: (profileController) {
@@ -235,7 +239,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

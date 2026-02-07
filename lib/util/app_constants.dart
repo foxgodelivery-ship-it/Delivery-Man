@@ -61,6 +61,7 @@ class AppConstants {
   static const String loyaltyReportUri = '/api/v1/delivery-man/loyalty-report';
   static const String loyaltyPointListUri = '/api/v1/delivery-man/loyalty-point-list';
   static const String pointConvertUri = '/api/v1/delivery-man/convert-loyalty-points';
+  static const String routeDirectionsUri = '/api/v1/delivery-man/map/route-directions';
 
   ///chat url
   static const String getConversationListUri = '/api/v1/delivery-man/message/list';

@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sixam_mart_delivery/api/api_client.dart';
 import 'package:sixam_mart_delivery/common/models/response_model.dart';
@@ -78,6 +79,12 @@ class OrderService implements OrderServiceInterface {
   @override
   Future<bool> submitParcelReturn({required int orderId, required String orderStatus, required int returnOtp}) async {
     return await orderRepositoryInterface.submitParcelReturn(orderId: orderId, orderStatus: orderStatus, returnOtp: returnOtp);
+  }
+
+
+  @override
+  Future<List<LatLng>?> getRouteDirections({required List<LatLng> waypoints}) async {
+    return await orderRepositoryInterface.getRouteDirections(waypoints: waypoints);
   }
 
   @override

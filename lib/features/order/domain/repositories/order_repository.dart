@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sixam_mart_delivery/api/api_client.dart';
 import 'package:sixam_mart_delivery/common/models/response_model.dart';
@@ -148,6 +149,60 @@ class OrderRepository implements OrderRepositoryInterface {
 
   String _getUserToken() {
     return sharedPreferences.getString(AppConstants.token) ?? "";
+  }
+
+
+
+  @override
+  Future<List<LatLng>?> getRouteDirections({required List<LatLng> waypoints}) async {
+    if (waypoints.length < 2) {
+      return null;
+    }
+
+    final List<Map<String, double>> points = waypoints
+        .map((point) => {
+              'lat': point.latitude,
+              'lng': point.longitude,
+            })
+        .toList();
+
+    Response response = await apiClient.postData(
+      AppConstants.routeDirectionsUri,
+      {
+        'token': _getUserToken(),
+        'points': points,
+      },
+      handleError: false,
+    );
+
+    if (response.statusCode != 200 || response.body == null) {
+      return null;
+    }
+
+    dynamic routePayload;
+    if (response.body is Map) {
+      final dynamic body = response.body;
+      routePayload = body['route_points'] ?? body['route'] ?? body['polyline_points'] ?? body['points'];
+    } else if (response.body is List) {
+      routePayload = response.body;
+    }
+
+    if (routePayload is! List) {
+      return null;
+    }
+
+    final List<LatLng> routePoints = [];
+    for (final dynamic item in routePayload) {
+      if (item is Map) {
+        final double? lat = double.tryParse(item['lat']?.toString() ?? item['latitude']?.toString() ?? '');
+        final double? lng = double.tryParse(item['lng']?.toString() ?? item['longitude']?.toString() ?? '');
+        if (lat != null && lng != null) {
+          routePoints.add(LatLng(lat, lng));
+        }
+      }
+    }
+
+    return routePoints.length >= 2 ? routePoints : null;
   }
 
   @override
