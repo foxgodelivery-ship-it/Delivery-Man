@@ -20,20 +20,17 @@ class InfoCardWidget extends StatelessWidget {
   final Function? messageOnTap;
   final OrderModel order;
   final bool isChatAllow;
-  final bool showCallButton;
   const InfoCardWidget({super.key, required this.title, required this.image, required this.name, required this.address, required this.phone,
-    required this.latitude, required this.longitude, required this.showButton, this.messageOnTap, this.isStore = false, required this.order,
-    required this.isChatAllow, this.showCallButton = true});
+    required this.latitude, required this.longitude, required this.showButton, this.messageOnTap, this.isStore = false, required this.order, required this.isChatAllow});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeSmall),
       padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-        boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.08), spreadRadius: 1, blurRadius: 12, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+        boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const SizedBox(height: Dimensions.paddingSizeSmall),
@@ -61,7 +58,14 @@ class InfoCardWidget extends StatelessWidget {
             SizedBox(height: address!.address != null ? Dimensions.paddingSizeExtraSmall : 0),
 
             Wrap(children: [
-              _buildAddressNumber(context, address),
+              (address!.streetNumber != null && address!.streetNumber!.isNotEmpty) ? Text('${'street_number'.tr}: ${address!.streetNumber!}, ',
+                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor), maxLines: 1, overflow: TextOverflow.ellipsis,
+              ) : const SizedBox(),
+
+              (address!.house != null && address!.house!.isNotEmpty) ? Text('${'house'.tr}: ${address!.house!}, ',
+                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor), maxLines: 1, overflow: TextOverflow.ellipsis,
+              ) : const SizedBox(),
+
               (address!.floor != null && address!.floor!.isNotEmpty) ? Text('${'floor'.tr}: ${address!.floor!}' ,
                 style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor), maxLines: 1, overflow: TextOverflow.ellipsis,
               ) : const SizedBox(),
@@ -70,7 +74,7 @@ class InfoCardWidget extends StatelessWidget {
 
             showButton ? Row(children: [
 
-              (isStore && showCallButton && phone != null && phone!.isNotEmpty) ? TextButton.icon(
+              TextButton.icon(
                 onPressed: () async {
                   if(await canLaunchUrlString('tel:$phone')) {
                     launchUrlString('tel:$phone', mode: LaunchMode.externalApplication);
@@ -83,7 +87,7 @@ class InfoCardWidget extends StatelessWidget {
                   'call'.tr,
                   style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).primaryColor),
                 ),
-              ) : const SizedBox(),
+              ),
 
               isStore && isChatAllow ? order.isGuest! ? const SizedBox() : TextButton.icon(
                 onPressed: messageOnTap as void Function()?,
@@ -118,25 +122,6 @@ class InfoCardWidget extends StatelessWidget {
           child: Text('no_store_data_found'.tr, style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall)))),
 
       ]),
-    );
-  }
-
-  Widget _buildAddressNumber(BuildContext context, DeliveryAddress? address) {
-    if (address == null) {
-      return const SizedBox();
-    }
-    final String? number = (address.house != null && address.house!.isNotEmpty)
-        ? address.house
-        : (address.streetNumber != null && address.streetNumber!.isNotEmpty)
-            ? address.streetNumber
-            : null;
-    if (number == null || number.isEmpty) {
-      return const SizedBox();
-    }
-    final String label = (address.house != null && address.house!.isNotEmpty) ? 'house'.tr : 'street_number'.tr;
-    return Text('$label: $number, ',
-      style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor),
-      maxLines: 1, overflow: TextOverflow.ellipsis,
     );
   }
 }

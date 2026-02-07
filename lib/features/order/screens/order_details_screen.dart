@@ -18,17 +18,11 @@ import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_app_bar_widget.dart';
-import 'package:sixam_mart_delivery/common/widgets/custom_bottom_sheet_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_image_widget.dart';
-import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/order_item_widget.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/info_card_widget.dart';
-import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
-import 'package:sixam_mart_delivery/features/order/widgets/parcel_cancelation/cancellation_reason_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final int? orderId;
@@ -45,15 +39,6 @@ class OrderDetailsScreen extends StatefulWidget {
 
 class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBindingObserver {
   Timer? _timer;
-  Timer? _customerWaitTimer;
-  int _waitSecondsRemaining = 0;
-  DateTime? _arrivedAt;
-  String? _serverTimestampReference;
-  DateTime? _serverReferenceTime;
-  DateTime? _localReferenceTime;
-  int? _arrivalLoadedOrderId;
-  static const int _waitDurationSeconds = 900;
-  static const double _arrivalRadiusMeters = 80;
 
   void _startApiCalling(){
     _timer?.cancel();
@@ -94,7 +79,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
     _timer?.cancel();
-    _customerWaitTimer?.cancel();
   }
 
   @override
@@ -123,11 +107,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
           child: GetBuilder<OrderController>(builder: (orderController) {
 
             OrderModel? controllerOrderModel = orderController.orderModel;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                _syncCustomerWaitState(controllerOrderModel);
-              }
-            });
 
             bool restConfModel = Get.find<SplashController>().configModel!.orderConfirmationModel != 'deliveryman';
 
@@ -193,9 +172,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
 
               showDeliveryConfirmImage = pickedUp && Get.find<SplashController>().configModel!.dmPictureUploadStatus! && controllerOrderModel.orderStatus != 'delivered';
             }
-            final bool hasPickedUp = controllerOrderModel?.orderStatus == 'picked_up';
-            final bool canChatCustomer = showChatPermission && hasPickedUp && controllerOrderModel?.customer != null;
-            final bool waitingActive = _arrivedAt != null && _waitSecondsRemaining > 0;
 
             return (orderController.orderDetailsModel != null && controllerOrderModel != null) ? Column(children: [
 
@@ -317,16 +293,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                     title: parcel ? 'sender_details'.tr : 'store_details'.tr,
                     address: parcel ? controllerOrderModel.deliveryAddress : DeliveryAddress(address: controllerOrderModel.storeAddress),
                     image: parcel ? '' : '${controllerOrderModel.storeLogoFullUrl}',
-                    name: parcel
-                        ? (hasPickedUp ? controllerOrderModel.deliveryAddress!.contactPersonName : 'Remetente')
-                        : controllerOrderModel.storeName,
-                    phone: parcel ? null : controllerOrderModel.storePhone,
+                    name: parcel ? controllerOrderModel.deliveryAddress!.contactPersonName : controllerOrderModel.storeName,
+                    phone: parcel ? controllerOrderModel.deliveryAddress!.contactPersonNumber : controllerOrderModel.storePhone,
                     latitude: parcel ? controllerOrderModel.deliveryAddress!.latitude : controllerOrderModel.storeLat,
                     longitude: parcel ? controllerOrderModel.deliveryAddress!.longitude : controllerOrderModel.storeLng,
                     showButton: (controllerOrderModel.orderStatus != 'delivered' && controllerOrderModel.orderStatus != 'failed'
                         && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded'),
                     isStore: parcel ? false : true, isChatAllow: showChatPermission,
-                    showCallButton: !parcel,
                     messageOnTap: () => Get.toNamed(RouteHelper.getChatRoute(
                       notificationBody: NotificationBodyModel(
                         orderId: controllerOrderModel.id, vendorId: orderController.orderDetailsModel![0].vendorId,
@@ -344,27 +317,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                     title: parcel ? 'receiver_details'.tr : 'customer_contact_details'.tr,
                     address: parcel ? controllerOrderModel.receiverDetails : controllerOrderModel.deliveryAddress,
                     image: parcel ? '' : controllerOrderModel.customer != null ? '${controllerOrderModel.customer!.imageFullUrl}' : '',
-                    name: hasPickedUp
-                        ? parcel ? controllerOrderModel.receiverDetails!.contactPersonName : controllerOrderModel.deliveryAddress!.contactPersonName
-                        : 'Destinatário',
-                    phone: null,
+                    name: parcel ? controllerOrderModel.receiverDetails!.contactPersonName : controllerOrderModel.deliveryAddress!.contactPersonName,
+                    phone: parcel ? controllerOrderModel.receiverDetails!.contactPersonNumber : controllerOrderModel.deliveryAddress!.contactPersonNumber,
                     latitude: parcel ? controllerOrderModel.receiverDetails!.latitude : controllerOrderModel.deliveryAddress!.latitude,
                     longitude: parcel ? controllerOrderModel.receiverDetails!.longitude : controllerOrderModel.deliveryAddress!.longitude,
                     showButton: controllerOrderModel.orderStatus != 'delivered' && controllerOrderModel.orderStatus != 'failed'
                         && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded',
-                    isStore: false, isChatAllow: canChatCustomer,
-                    showCallButton: false,
-                    messageOnTap: canChatCustomer ? () => Get.toNamed(RouteHelper.getChatRoute(
+                    isStore: parcel ? false : true, isChatAllow: showChatPermission,
+                    messageOnTap: () => Get.toNamed(RouteHelper.getChatRoute(
                       notificationBody: NotificationBodyModel(
                         orderId: controllerOrderModel.id, customerId: controllerOrderModel.customer!.id,
                       ),
                       user: User(
-                        id: controllerOrderModel.customer!.id,
-                        fName: controllerOrderModel.customer!.fName,
-                        lName: controllerOrderModel.customer!.lName,
-                        imageFullUrl: controllerOrderModel.customer!.imageFullUrl,
+                        id: controllerOrderModel.customer!.id, fName: controllerOrderModel.customer!.fName,
+                        lName: controllerOrderModel.customer!.lName, imageFullUrl: controllerOrderModel.customer!.imageFullUrl,
                       ),
-                    )) : null,
+                    )),
                     order: order,
                   ),
                   const SizedBox(height: Dimensions.paddingSizeLarge),
@@ -752,16 +720,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                 ]),
               )),
 
-              _buildCustomerArrivalSection(controllerOrderModel),
-              _buildReturnNavigationSection(controllerOrderModel),
-
-              waitingActive ? const SizedBox() : (parcel ? ParcelBottomView(
+              parcel ? ParcelBottomView(
                 orderController: orderController, controllerOrderModel: controllerOrderModel, orderId: widget.orderId!,
                 fromLocationScreen: widget.fromLocationScreen, showDeliveryConfirmImage: showDeliveryConfirmImage,
               ) : RegularOrderBottomView(
                 orderController: orderController, controllerOrderModel: controllerOrderModel, fromLocationScreen: widget.fromLocationScreen,
                 orderId: widget.orderId!, showDeliveryConfirmImage: showDeliveryConfirmImage,
-              )),
+              ),
 
             ]) : const Center(child: CircularProgressIndicator());
           }),
@@ -796,290 +761,4 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       );
     },
   );
-
-  void _syncCustomerWaitState(OrderModel? order) {
-    _loadArrivalState(order);
-  }
-
-  void _updateServerTimeReference(OrderModel? order) {
-    if (order == null || order.orderStatus != AppConstants.pickedUp) {
-      _serverReferenceTime = null;
-      _localReferenceTime = null;
-      _serverTimestampReference = null;
-      return;
-    }
-    final String? updatedAt = order.updatedAt;
-    if (updatedAt == null || updatedAt == _serverTimestampReference) {
-      return;
-    }
-
-    try {
-      final DateTime serverTime = DateConverterHelper.dateTimeStringToDate(updatedAt);
-      _serverReferenceTime = serverTime;
-      _localReferenceTime = DateTime.now();
-      _serverTimestampReference = updatedAt;
-    } catch (_) {
-      _serverReferenceTime = null;
-      _localReferenceTime = null;
-      _serverTimestampReference = null;
-    }
-  }
-
-  DateTime? _currentServerTime() {
-    if (_serverReferenceTime == null || _localReferenceTime == null) {
-      return null;
-    }
-    final Duration elapsed = DateTime.now().difference(_localReferenceTime!);
-    return _serverReferenceTime!.add(elapsed);
-  }
-
-  void _startCustomerWaitTimer() {
-    _customerWaitTimer?.cancel();
-    _updateWaitSecondsRemaining();
-    _customerWaitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      _updateWaitSecondsRemaining();
-    });
-  }
-
-  void _updateWaitSecondsRemaining() {
-    final int remaining = _calculateRemainingSeconds();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _waitSecondsRemaining = remaining;
-    });
-    if (remaining == 0) {
-      _customerWaitTimer?.cancel();
-    }
-  }
-
-  int _calculateRemainingSeconds() {
-    if (_arrivedAt == null) {
-      return 0;
-    }
-    final DateTime? serverNow = _currentServerTime();
-    if (serverNow == null) {
-      return 0;
-    }
-    final int remaining = _arrivedAt!
-        .add(const Duration(seconds: _waitDurationSeconds))
-        .difference(serverNow)
-        .inSeconds;
-    return remaining > 0 ? remaining : 0;
-  }
-
-  void _clearCustomerWaitState() {
-    _customerWaitTimer?.cancel();
-    _customerWaitTimer = null;
-    if (mounted) {
-      setState(() {
-        _waitSecondsRemaining = 0;
-        _arrivedAt = null;
-        _arrivalLoadedOrderId = null;
-      });
-    }
-  }
-
-  DateTime? _getArrivalFromServer(OrderModel order) {
-    if (order.orderStatus == AppConstants.pickedUp && order.updatedAt != null) {
-      try {
-        return DateConverterHelper.dateTimeStringToDate(order.updatedAt!);
-      } catch (_) {
-        return null;
-      }
-    }
-    return null;
-  }
-
-  void _loadArrivalState(OrderModel? order) {
-    if (order == null || order.orderStatus != AppConstants.pickedUp) {
-      _clearCustomerWaitState();
-      return;
-    }
-
-    _updateServerTimeReference(order);
-    final DateTime? arrivedAt = _getArrivalFromServer(order);
-    if (arrivedAt == null) {
-      _clearCustomerWaitState();
-      return;
-    }
-
-    final bool shouldUpdate = _arrivalLoadedOrderId != order.id || _arrivedAt == null || !_arrivedAt!.isAtSameMomentAs(arrivedAt);
-    if (shouldUpdate) {
-      setState(() {
-        _arrivedAt = arrivedAt;
-        _arrivalLoadedOrderId = order.id;
-        _waitSecondsRemaining = _calculateRemainingSeconds();
-      });
-      if (_waitSecondsRemaining > 0) {
-        _startCustomerWaitTimer();
-      } else {
-        _customerWaitTimer?.cancel();
-      }
-    }
-  }
-
-  String _formatWaitTime(int seconds) {
-    final int minutes = seconds ~/ 60;
-    final int remainderSeconds = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remainderSeconds.toString().padLeft(2, '0')}';
-  }
-
-  Future<bool> _isWithinCustomerRadius(OrderModel order) async {
-    final String? latitude = order.orderType == 'parcel'
-        ? order.receiverDetails?.latitude
-        : order.deliveryAddress?.latitude;
-    final String? longitude = order.orderType == 'parcel'
-        ? order.receiverDetails?.longitude
-        : order.deliveryAddress?.longitude;
-
-    final double? customerLat = double.tryParse(latitude ?? '');
-    final double? customerLng = double.tryParse(longitude ?? '');
-    if (customerLat == null || customerLng == null) {
-      showCustomSnackBar('Não foi possível obter a localização do cliente.');
-      return false;
-    }
-
-    try {
-      final Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      final double distance = Geolocator.distanceBetween(
-        position.latitude,
-        position.longitude,
-        customerLat,
-        customerLng,
-      );
-      if (distance > _arrivalRadiusMeters) {
-        showCustomSnackBar('Você precisa estar próximo do endereço para confirmar chegada.');
-        return false;
-      }
-      return true;
-    } catch (e) {
-      showCustomSnackBar('Não foi possível obter sua localização.');
-      return false;
-    }
-  }
-
-  Widget _buildCustomerArrivalSection(OrderModel order) {
-    final bool isPickedUp = order.orderStatus == AppConstants.pickedUp;
-    if (!isPickedUp) {
-      return const SizedBox();
-    }
-
-    final bool hasArrived = _arrivedAt != null;
-    final bool waitingActive = _arrivedAt != null && _waitSecondsRemaining > 0;
-    final bool canFinalize = _arrivedAt != null && _waitSecondsRemaining == 0;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5, spreadRadius: 1)],
-      ),
-      child: Column(
-        children: [
-          if (!hasArrived)
-            CustomButtonWidget(
-              buttonText: 'Cheguei no cliente',
-              onPressed: () async {
-                final bool isWithinRadius = await _isWithinCustomerRadius(order);
-                if (!isWithinRadius) {
-                  return;
-                }
-                final DateTime? arrivedAt = _getArrivalFromServer(order);
-                if (arrivedAt == null) {
-                  showCustomSnackBar('Não foi possível obter o horário do servidor.');
-                  return;
-                }
-
-                setState(() {
-                  _arrivedAt = arrivedAt;
-                  _arrivalLoadedOrderId = order.id;
-                  _waitSecondsRemaining = _calculateRemainingSeconds();
-                });
-                if (_waitSecondsRemaining > 0) {
-                  _startCustomerWaitTimer();
-                }
-              },
-            ),
-          if (waitingActive)
-            Column(
-              children: [
-                Text(
-                  'Aguardando cliente: ${_formatWaitTime(_waitSecondsRemaining)}',
-                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall),
-                ),
-                const SizedBox(height: Dimensions.paddingSizeSmall),
-              ],
-            ),
-          if (canFinalize)
-            Column(
-              children: [
-                CustomButtonWidget(
-                  buttonText: 'Falar com suporte',
-                  onPressed: () {
-                    Get.toNamed(RouteHelper.getConversationListRoute());
-                  },
-                ),
-                const SizedBox(height: Dimensions.paddingSizeSmall),
-                CustomButtonWidget(
-                  buttonText: 'Cliente não encontrado',
-                  onPressed: () async {
-                    final bool isWithinRadius = await _isWithinCustomerRadius(order);
-                    if (isWithinRadius) {
-                      if (order.orderType == 'parcel') {
-                        showCustomBottomSheet(
-                          child: CancellationReasonBottomSheet(
-                            isBeforePickup: false,
-                            orderId: order.id!,
-                          ),
-                        );
-                      } else {
-                        Get.toNamed(RouteHelper.getConversationListRoute());
-                        showCustomSnackBar('Para pedido normal, finalize via suporte no painel.');
-                      }
-                    }
-                  },
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReturnNavigationSection(OrderModel order) {
-    final bool isParcelReturnPending = order.orderType == 'parcel'
-        && order.orderStatus == AppConstants.canceled
-        && order.parcelCancellation?.beforePickup != 1;
-    final bool isReturnFlow = order.orderStatus == AppConstants.returned || isParcelReturnPending;
-    if (!isReturnFlow || order.storeLat == null || order.storeLng == null) {
-      return const SizedBox();
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5, spreadRadius: 1)],
-      ),
-      child: CustomButtonWidget(
-        buttonText: 'Navegar para devolução (Loja)',
-        onPressed: () async {
-          final String url = 'https://www.google.com/maps/dir/?api=1&destination=${order.storeLat},${order.storeLng}&mode=d';
-          if (await canLaunchUrlString(url)) {
-            await launchUrlString(url, mode: LaunchMode.externalApplication);
-          } else {
-            showCustomSnackBar('${'could_not_launch'.tr} $url');
-          }
-        },
-      ),
-    );
-  }
 }

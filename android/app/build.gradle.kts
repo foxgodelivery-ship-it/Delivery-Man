@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.sixamtech.sixam_mart_delivery_app"
+    namespace = "com.foxgodelivery.deliveryman"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
