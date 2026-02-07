@@ -36,6 +36,7 @@ class OrderLocationScreen extends StatefulWidget {
 }
 
 class _OrderLocationScreenState extends State<OrderLocationScreen> {
+  static const int totalConfigSeconds = 60;
   GoogleMapController? _controller;
   final Set<Marker> _markers = HashSet<Marker>();
   final Set<Polyline> _polylines = HashSet<Polyline>();
@@ -46,6 +47,8 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
   final Duration _directionsThrottle = const Duration(seconds: 5);
   final double _directionsMinMoveMeters = 50.0;
   Timer? _timer;
+  Timer? _countdownTimer;
+  int _seconds = totalConfigSeconds;
 
 
   @override
@@ -57,6 +60,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _countdownTimer?.cancel();
     super.dispose();
   }
 
@@ -65,10 +69,25 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
     _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
       Get.find<OrderController>().playNotificationSound();
     });
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if(!mounted) {
+        timer.cancel();
+        return;
+      }
+      if(_seconds > 0) {
+        setState(() {
+          _seconds--;
+        });
+      } else {
+        timer.cancel();
+      }
+    });
   }
 
   Future<void> _stopAlarmAndService() async {
     _timer?.cancel();
+    _countdownTimer?.cancel();
     await Get.find<OrderController>().stopNotificationSound();
     await stopService();
   }
@@ -135,6 +154,8 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
             fromNotification: widget.fromNotification,
             currentLatLng: _currentLatLng,
             onActionHandled: _stopAlarmAndService,
+            seconds: _seconds,
+            totalConfigSeconds: totalConfigSeconds,
           ),
         ),
 
