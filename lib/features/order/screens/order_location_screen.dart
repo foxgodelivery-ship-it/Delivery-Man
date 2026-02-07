@@ -38,50 +38,6 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
   GoogleMapController? _controller;
   final Set<Marker> _markers = HashSet<Marker>();
   final Set<Polyline> _polylines = HashSet<Polyline>();
-  StreamSubscription<Position>? _positionSubscription;
-  LatLng? _currentLatLng;
-  DateTime? _lastDirectionsFetchAt;
-  LatLng? _lastDirectionsOrigin;
-  bool _isFetchingDirections = false;
-
-  static const Duration _directionsThrottle = Duration(seconds: 15);
-  static const double _directionsMinMoveMeters = 75;
-
-  @override
-  void initState() {
-    super.initState();
-    _initLiveLocation();
-  }
-
-  @override
-  void dispose() {
-    _positionSubscription?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _initLiveLocation() async {
-    try {
-      final Position current = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.bestForNavigation),
-      );
-      _currentLatLng = LatLng(current.latitude, current.longitude);
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (_) {}
-
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 5,
-      ),
-    ).listen((Position position) {
-      _currentLatLng = LatLng(position.latitude, position.longitude);
-      if (mounted) {
-        setMarkerAndRoute(widget.orderModel, widget.orderModel.orderType == 'parcel');
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +45,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
 
     return Scaffold(
       body: Stack(children: [
+
         GoogleMap(
           initialCameraPosition: CameraPosition(target: LatLng(
             double.parse(widget.orderModel.deliveryAddress?.latitude ?? '0'), double.parse(widget.orderModel.deliveryAddress?.longitude ?? '0'),
@@ -142,7 +99,6 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
             onTap: widget.onTap,
             index: widget.index,
             fromNotification: widget.fromNotification,
-            currentLatLng: _currentLatLng,
           ),
         ),
 
@@ -154,14 +110,14 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
     if(_controller == null) {
       return;
     }
-    final lat = _currentLatLng?.latitude ?? Get.find<ProfileController>().recordLocationBody?.latitude;
-    final lng = _currentLatLng?.longitude ?? Get.find<ProfileController>().recordLocationBody?.longitude;
+    final lat = Get.find<ProfileController>().recordLocationBody?.latitude;
+    final lng = Get.find<ProfileController>().recordLocationBody?.longitude;
     if(lat != null && lng != null) {
       _controller!.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat, lng), 16));
     }
   }
 
-  Future<void> setMarkerAndRoute(OrderModel orderModel, bool parcel) async {
+  void setMarkerAndRoute(OrderModel orderModel, bool parcel) async {
     try {
       Uint8List destinationImageData = await convertAssetToUnit8List(Images.customerMarker, width: 100);
       Uint8List restaurantImageData = await convertAssetToUnit8List(parcel ? Images.userMarker : Images.restaurantMarker, width: parcel ? 70 : 100);
@@ -177,19 +133,17 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
         double deliveryManLat = _currentLatLng?.latitude ?? Get.find<ProfileController>().recordLocationBody?.latitude ?? 0;
         double deliveryManLng = _currentLatLng?.longitude ?? Get.find<ProfileController>().recordLocationBody?.longitude ?? 0;
 
-        final List<LatLng> routeWaypoints = [];
+        final List<LatLng> routePoints = [];
         if (deliveryManLat != 0 || deliveryManLng != 0) {
-          routeWaypoints.add(LatLng(deliveryManLat, deliveryManLng));
+          routePoints.add(LatLng(deliveryManLat, deliveryManLng));
         }
         if (parcel) {
-          routeWaypoints.add(LatLng(deliveryLat, deliveryLng));
-          routeWaypoints.add(LatLng(receiverLat, receiverLng));
+          routePoints.add(LatLng(deliveryLat, deliveryLng));
+          routePoints.add(LatLng(receiverLat, receiverLng));
         } else {
-          routeWaypoints.add(LatLng(storeLat, storeLng));
-          routeWaypoints.add(LatLng(deliveryLat, deliveryLng));
+          routePoints.add(LatLng(storeLat, storeLng));
+          routePoints.add(LatLng(deliveryLat, deliveryLng));
         }
-
-        final List<LatLng> routePoints = await _resolveRoutePoints(routeWaypoints);
 
         if (routePoints.length > 1) {
           _polylines
@@ -201,11 +155,9 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
               width: 7,
               jointType: JointType.round,
             ));
-        } else {
-          _polylines.clear();
         }
 
-        LatLngBounds bounds = _buildBounds(routeWaypoints);
+        LatLngBounds bounds = _buildBounds(routePoints);
         _controller!.moveCamera(CameraUpdate.newLatLngBounds(bounds, 60));
 
         _markers.clear();
@@ -246,7 +198,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
           ));
         }
 
-        if (_currentLatLng != null || Get.find<ProfileController>().recordLocationBody != null) {
+        if (Get.find<ProfileController>().recordLocationBody != null) {
           _markers.add(Marker(
             markerId: const MarkerId('delivery_boy'),
             position: LatLng(deliveryManLat, deliveryManLng),
@@ -301,6 +253,41 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
     }
 
     return routeWaypoints;
+  }
+
+  LatLngBounds _buildBounds(List<LatLng> points) {
+    if (points.isEmpty) {
+      return const LatLngBounds(
+        southwest: LatLng(-90, -180),
+        northeast: LatLng(90, 180),
+      );
+    }
+
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+
+    for (final point in points) {
+      minLat = min(minLat, point.latitude);
+      maxLat = max(maxLat, point.latitude);
+      minLng = min(minLng, point.longitude);
+      maxLng = max(maxLng, point.longitude);
+    }
+
+    if (minLat == maxLat) {
+      minLat -= 0.01;
+      maxLat += 0.01;
+    }
+    if (minLng == maxLng) {
+      minLng -= 0.01;
+      maxLng += 0.01;
+    }
+
+    return LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
   }
 
   LatLngBounds _buildBounds(List<LatLng> points) {

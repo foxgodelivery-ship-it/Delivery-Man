@@ -20,7 +20,6 @@ class LocationCardWidget extends StatelessWidget {
   final int index;
   final Function onTap;
   final bool fromNotification;
-  final LatLng? currentLatLng;
   const LocationCardWidget({
     super.key,
     required this.orderModel,
@@ -28,7 +27,6 @@ class LocationCardWidget extends StatelessWidget {
     required this.index,
     required this.onTap,
     this.fromNotification = false,
-    this.currentLatLng,
   });
 
   @override
