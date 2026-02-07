@@ -21,6 +21,7 @@ class LocationCardWidget extends StatelessWidget {
   final Function onTap;
   final bool fromNotification;
   final LatLng? currentLatLng;
+  final Future<void> Function()? onActionHandled;
   const LocationCardWidget({
     super.key,
     required this.orderModel,
@@ -29,6 +30,7 @@ class LocationCardWidget extends StatelessWidget {
     required this.onTap,
     this.fromNotification = false,
     this.currentLatLng,
+    this.onActionHandled,
   });
 
   @override
@@ -144,7 +146,8 @@ class LocationCardWidget extends StatelessWidget {
                 icon: Images.warning,
                 title: 'are_you_sure_to_accept'.tr,
                 description: parcel ? 'you_want_to_accept_this_delivery'.tr : 'you_want_to_accept_this_order'.tr,
-                onYesPressed: () {
+                onYesPressed: () async {
+                  await onActionHandled?.call();
                   orderController.acceptOrder(orderModel.id, index, orderModel).then((isSuccess) {
                     if (isSuccess) {
                       onTap();
@@ -175,7 +178,8 @@ class LocationCardWidget extends StatelessWidget {
                   icon: Images.warning,
                   title: 'are_you_sure_to_ignore'.tr,
                   description: parcel ? 'you_want_to_ignore_this_delivery'.tr : 'you_want_to_ignore_this_order'.tr,
-                  onYesPressed: () {
+                  onYesPressed: () async {
+                    await onActionHandled?.call();
                     orderController.ignoreOrder(index);
                     Get.back();
                     Get.back();
