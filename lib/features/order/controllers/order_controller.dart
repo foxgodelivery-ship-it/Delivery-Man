@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -21,6 +22,8 @@ import 'package:sixam_mart_delivery/features/order/domain/services/order_service
 class OrderController extends GetxController implements GetxService {
   final OrderServiceInterface orderServiceInterface;
   OrderController({required this.orderServiceInterface});
+
+  final AudioPlayer _notificationPlayer = AudioPlayer();
 
   List<OrderModel>? _currentOrderList;
   List<OrderModel>? get currentOrderList => _currentOrderList;
@@ -462,6 +465,20 @@ class OrderController extends GetxController implements GetxService {
 
     _isLoading = false;
     update();
+  }
+
+  Future<void> playNotificationSound() async {
+    await _notificationPlayer.play(AssetSource('notification.mp3'));
+  }
+
+  Future<void> stopNotificationSound() async {
+    await _notificationPlayer.stop();
+  }
+
+  @override
+  void onClose() {
+    _notificationPlayer.dispose();
+    super.onClose();
   }
   
 }

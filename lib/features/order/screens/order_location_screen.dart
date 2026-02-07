@@ -14,6 +14,7 @@ import 'package:sixam_mart_delivery/features/profile/controllers/profile_control
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/images.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/location_card_widget.dart';
+import 'package:sixam_mart_delivery/helper/notification_helper.dart';
 
 class OrderLocationScreen extends StatefulWidget {
   final OrderModel orderModel;
@@ -44,6 +45,33 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
   bool _isFetchingDirections = false;
   final Duration _directionsThrottle = const Duration(seconds: 5);
   final double _directionsMinMoveMeters = 50.0;
+  Timer? _timer;
+
+
+  @override
+  void initState() {
+    super.initState();
+    _startAlarm();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startAlarm() {
+    Get.find<OrderController>().playNotificationSound();
+    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      Get.find<OrderController>().playNotificationSound();
+    });
+  }
+
+  Future<void> _stopAlarmAndService() async {
+    _timer?.cancel();
+    await Get.find<OrderController>().stopNotificationSound();
+    await stopService();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +134,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
             index: widget.index,
             fromNotification: widget.fromNotification,
             currentLatLng: _currentLatLng,
+            onActionHandled: _stopAlarmAndService,
           ),
         ),
 
@@ -309,6 +338,8 @@ class _RoundMapButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   const _RoundMapButton({required this.icon, required this.onTap});
+
+
 
   @override
   Widget build(BuildContext context) {
