@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sixam_mart_delivery/api/api_client.dart';
 import 'package:sixam_mart_delivery/common/models/response_model.dart';
@@ -27,4 +28,5 @@ abstract class OrderServiceInterface{
   Future<ParcelCancellationReasonsModel?> getParcelCancellationReasons({required bool isBeforePickup});
   Future<bool> addParcelReturnDate({required int orderId, required String returnDate});
   Future<bool> submitParcelReturn({required int orderId, required String orderStatus, required int returnOtp});
+  Future<List<LatLng>?> getRouteDirections({required List<LatLng> waypoints});
 }

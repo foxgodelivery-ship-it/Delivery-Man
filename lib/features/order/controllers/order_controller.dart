@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:sixam_mart_delivery/common/models/response_model.dart';
@@ -233,6 +234,12 @@ class OrderController extends GetxController implements GetxService {
     _isLoading = false;
     update();
     return responseModel.isSuccess;
+  }
+
+
+
+  Future<List<LatLng>?> getRouteDirections({required List<LatLng> waypoints}) async {
+    return await orderServiceInterface.getRouteDirections(waypoints: waypoints);
   }
 
   Future<void> getOrderDetails(int? orderID, bool parcel) async {
