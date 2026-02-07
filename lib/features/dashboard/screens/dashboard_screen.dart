@@ -11,6 +11,8 @@ import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_alert_dialog_widget.dart';
 import 'package:sixam_mart_delivery/features/dashboard/widgets/bottom_nav_item_widget.dart';
 import 'package:sixam_mart_delivery/features/dashboard/widgets/new_request_dialog_widget.dart';
+import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
+import 'package:sixam_mart_delivery/features/order/screens/order_location_screen.dart';
 import 'package:sixam_mart_delivery/features/home/screens/home_screen.dart';
 import 'package:sixam_mart_delivery/features/profile/screens/profile_screen.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_request_screen.dart';
@@ -56,7 +58,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     showDisbursementWarningMessage();
     Get.find<OrderController>().getLatestOrders();
     
-    _stream = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    _stream = FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
 
       String? type = message.data['body_loc_key'] ?? message.data['type'];
       String? orderID = message.data['title_loc_key'] ?? message.data['order_id'];
@@ -64,16 +66,36 @@ class DashboardScreenState extends State<DashboardScreen> {
       if(type != 'assign' && type != 'new_order' && type != 'message' && type != 'order_request' && type != 'order_status') {
         NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
       }
-      if(type == 'new_order' || type == 'order_request') {
-        Get.find<OrderController>().getCurrentOrders();
-        Get.find<OrderController>().getLatestOrders();
-        Get.dialog(NewRequestDialogWidget(isRequest: true, onTap: () => _navigateRequestPage(), orderId: int.parse(message.data['order_id'].toString()), isParcel: isParcel));
-      }else if(type == 'assign' && orderID != null && orderID.isNotEmpty) {
-        Get.find<OrderController>().getCurrentOrders();
-        Get.find<OrderController>().getLatestOrders();
-        Get.dialog(NewRequestDialogWidget(isRequest: false, orderId: int.parse(message.data['order_id'].toString()), isParcel: isParcel, onTap: () {
-          Get.offAllNamed(RouteHelper.getOrderDetailsRoute(int.parse(orderID), fromNotification: true));
-        }));
+
+      if(type == 'new_order' || type == 'order_request' || type == 'assign') {
+        await Get.find<OrderController>().getCurrentOrders();
+        await Get.find<OrderController>().getLatestOrders();
+
+        int? incomingOrderId = int.tryParse((message.data['order_id'] ?? orderID ?? '').toString());
+        OrderModel? incomingOrder = _findIncomingOrderById(incomingOrderId);
+
+        if(incomingOrder != null) {
+          Get.to(() => OrderLocationScreen(
+            orderModel: incomingOrder,
+            orderController: Get.find<OrderController>(),
+            index: _findLatestOrderIndex(incomingOrder.id),
+            onTap: _navigateRequestPage,
+            fromNotification: true,
+          ));
+        } else {
+          Get.dialog(NewRequestDialogWidget(
+            isRequest: type == 'new_order' || type == 'order_request',
+            orderId: incomingOrderId ?? 0,
+            isParcel: isParcel,
+            onTap: () {
+              if(type == 'assign' && orderID != null && orderID.isNotEmpty) {
+                Get.offAllNamed(RouteHelper.getOrderDetailsRoute(int.parse(orderID), fromNotification: true));
+              } else {
+                _navigateRequestPage();
+              }
+            },
+          ));
+        }
       }else if(type == 'block') {
         Get.find<AuthController>().clearSharedData();
         Get.find<ProfileController>().stopLocationRecord();
@@ -168,6 +190,42 @@ class DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
     );
+  }
+
+
+  OrderModel? _findIncomingOrderById(int? orderId) {
+    if(orderId == null) {
+      return null;
+    }
+
+    final OrderController orderController = Get.find<OrderController>();
+    final latest = orderController.latestOrderList;
+    if(latest != null) {
+      for(final order in latest) {
+        if(order.id == orderId) {
+          return order;
+        }
+      }
+    }
+
+    final current = orderController.currentOrderList;
+    if(current != null) {
+      for(final order in current) {
+        if(order.id == orderId) {
+          return order;
+        }
+      }
+    }
+    return null;
+  }
+
+  int _findLatestOrderIndex(int? orderId) {
+    final latest = Get.find<OrderController>().latestOrderList;
+    if(latest == null || orderId == null) {
+      return 0;
+    }
+    final index = latest.indexWhere((order) => order.id == orderId);
+    return index < 0 ? 0 : index;
   }
 
   void _setPage(int pageIndex) {
