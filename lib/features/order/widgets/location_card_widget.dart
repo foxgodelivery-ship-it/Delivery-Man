@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -22,6 +23,8 @@ class LocationCardWidget extends StatelessWidget {
   final bool fromNotification;
   final LatLng? currentLatLng;
   final Future<void> Function()? onActionHandled;
+  final int seconds;
+  final int totalConfigSeconds;
   const LocationCardWidget({
     super.key,
     required this.orderModel,
@@ -31,6 +34,8 @@ class LocationCardWidget extends StatelessWidget {
     this.fromNotification = false,
     this.currentLatLng,
     this.onActionHandled,
+    required this.seconds,
+    required this.totalConfigSeconds,
   });
 
   @override
@@ -50,7 +55,10 @@ class LocationCardWidget extends StatelessWidget {
     final double tips = orderModel.dmTips ?? 0;
     final String sourceAddress = parcel ? (orderModel.deliveryAddress?.address ?? '') : (orderModel.storeAddress ?? '');
     final String destinationAddress = parcel ? (orderModel.receiverDetails?.address ?? '') : (orderModel.deliveryAddress?.address ?? '');
-    final String deliveryTime = _deliveryTimeLabel(orderModel.scheduleAt);
+    final int travelTimeInMinutes = max(1, (totalDistance * 4).ceil());
+    final DateTime eta = DateTime.now().add(Duration(minutes: travelTimeInMinutes + 5));
+    final String deliveryTime = _deliveryTimeLabel(eta);
+    final double progressValue = (seconds / totalConfigSeconds).clamp(0.0, 1.0).toDouble();
 
     return Container(
       decoration: BoxDecoration(
@@ -112,7 +120,12 @@ class LocationCardWidget extends StatelessWidget {
                     ),
                 ]),
               ),
-              Container(height: 4, color: Theme.of(context).primaryColor),
+              LinearProgressIndicator(
+                minHeight: 4,
+                value: progressValue,
+                color: Theme.of(context).primaryColor,
+                backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.25),
+              ),
             ]),
           ),
 
@@ -193,12 +206,11 @@ class LocationCardWidget extends StatelessWidget {
     );
   }
 
-  String _deliveryTimeLabel(String? scheduleAt) {
-    if (scheduleAt == null || scheduleAt.isEmpty) {
-      return '';
-    }
+  String _deliveryTimeLabel(DateTime eta) {
     try {
-      return DateConverterHelper.dateTimeStringToDateTime(scheduleAt).split(' ').last;
+      final String etaString = '${eta.year.toString().padLeft(4, '0')}-${eta.month.toString().padLeft(2, '0')}-${eta.day.toString().padLeft(2, '0')} '
+          '${eta.hour.toString().padLeft(2, '0')}:${eta.minute.toString().padLeft(2, '0')}:${eta.second.toString().padLeft(2, '0')}';
+      return DateConverterHelper.dateTimeStringToDateTime(etaString).split(' ').last;
     } catch (_) {
       return '';
     }
