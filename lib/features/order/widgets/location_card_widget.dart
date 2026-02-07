@@ -3,8 +3,6 @@ import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/address/controllers/address_controller.dart';
-import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
-import 'package:sixam_mart_delivery/features/splash/controllers/splash_controller.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/helper/date_converter_helper.dart';
 import 'package:sixam_mart_delivery/helper/price_converter_helper.dart';
@@ -14,7 +12,6 @@ import 'package:sixam_mart_delivery/util/images.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/common/widgets/confirmation_dialog_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
-import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_details_screen.dart';
 
 class LocationCardWidget extends StatelessWidget {
@@ -22,7 +19,15 @@ class LocationCardWidget extends StatelessWidget {
   final OrderController orderController;
   final int index;
   final Function onTap;
-  const LocationCardWidget({super.key, required this.orderModel, required this.orderController, required this.index, required this.onTap});
+  final bool fromNotification;
+  const LocationCardWidget({
+    super.key,
+    required this.orderModel,
+    required this.orderController,
+    required this.index,
+    required this.onTap,
+    this.fromNotification = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -34,157 +39,187 @@ class LocationCardWidget extends StatelessWidget {
       LatLng(double.parse(parcel ? orderModel.deliveryAddress?.latitude ?? '0' : orderModel.storeLat ?? '0'), double.parse(parcel ? orderModel.deliveryAddress?.longitude ?? '0' : orderModel.storeLng ?? '0')),
       customerLatLng: LatLng(double.parse(parcel ? orderModel.receiverDetails?.latitude ?? '0' : orderModel.deliveryAddress?.latitude ?? '0'), double.parse(parcel ? orderModel.receiverDetails?.longitude ?? '0' : orderModel.deliveryAddress?.longitude ?? '0')),
     );
+
+    final double totalDistance = restaurantDistance + restaurantToCustomerDistance;
+    final double baseEarning = orderModel.originalDeliveryCharge ?? orderModel.deliveryCharge ?? 0;
+    final double tips = orderModel.dmTips ?? 0;
+    final String sourceAddress = parcel ? (orderModel.deliveryAddress?.address ?? '') : (orderModel.storeAddress ?? '');
+    final String destinationAddress = parcel ? (orderModel.receiverDetails?.address ?? '') : (orderModel.deliveryAddress?.address ?? '');
+    final String deliveryTime = _deliveryTimeLabel(orderModel.scheduleAt);
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 18)],
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-          padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.18),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  child: Text(
+                    parcel ? 'Entrega Parcel' : 'Entrega Food',
+                    style: robotoBold,
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeDefault, vertical: Dimensions.paddingSizeSmall),
-                child: Text(
-                  '${restaurantDistance > 1000 ? '1000+' : restaurantDistance.toStringAsFixed(2)} ${'km_aprox'.tr} ', maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall),
-                ),
               ),
-              const SizedBox(height: Dimensions.paddingSizeSmall),
-
-              Text(
-                parcel ? 'your_distance_from_sender'.tr : 'your_distance_from_restaurant'.tr, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeDefault, color: Theme.of(context).disabledColor),
-              ),
-            ]),
-
-            Text(
-              '${DateConverterHelper.timeDistanceInMin(orderModel.createdAt!)} ${'mins_ago'.tr}',
-              style: robotoBold.copyWith(color: Theme.of(context).primaryColor),
-            ),
-          ]),
-        ),
-
-        const Divider(),
-
-        Padding(
-          padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeDefault, vertical: Dimensions.paddingSizeSmall),
-              child: Text(
-                '${restaurantToCustomerDistance > 1000 ? '1000+' : restaurantToCustomerDistance.toStringAsFixed(2)} ${'km_aprox'.tr}', maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall),
-              ),
-            ),
-            const SizedBox(height: Dimensions.paddingSizeSmall),
-
-            Text(
-              parcel ? 'from_sender_to_receiver_distance'.tr : 'from_customer_to_restaurant_distance'.tr, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeDefault, color: Theme.of(context).disabledColor),
-            ),
-          ]),
-        ),
-
-        Container(
-          height: 80,
-          decoration: BoxDecoration(
-              color: Theme.of(context).disabledColor.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(Dimensions.radiusDefault))
-          ),
-          padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-          margin: const EdgeInsets.all(0.2),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-
-            Expanded(
-              child: Wrap(alignment: WrapAlignment.center, runAlignment: WrapAlignment.center, children: [
-
-                (Get.find<SplashController>().configModel!.showDmEarning! && Get.find<ProfileController>().profileModel!.earnings == 1) ? Text(
-                  PriceConverterHelper.convertPrice(orderModel.originalDeliveryCharge! + orderModel.dmTips!),
-                  style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeLarge),
-                ) : const SizedBox(),
-                const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                (Get.find<SplashController>().configModel!.showDmEarning! && Get.find<ProfileController>().profileModel!.earnings == 1) ? Text(
-                  '(${orderModel.paymentMethod == 'cash_on_delivery' ? 'cod'.tr : 'digitally_paid'.tr})',
-                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall),
-                ) : const SizedBox(),
-
-              ]),
-            ),
-
-            Expanded(
-              child: Row(children: [
-                Expanded(child: TextButton(
-                  onPressed: () => Get.dialog(ConfirmationDialogWidget(
-                    icon: Images.warning, title: 'are_you_sure_to_ignore'.tr,
-                    description: parcel ? 'you_want_to_ignore_this_delivery'.tr : 'you_want_to_ignore_this_order'.tr,
-                    onYesPressed: ()  {
-                      if(Get.isSnackbarOpen){
-                        Get.back();
-                      }
-                      orderController.ignoreOrder(index);
-                      Get.back();
-                      Get.back();
-                      showCustomSnackBar('order_ignored'.tr, isError: false);
-                    },
-                  ), barrierDismissible: false),
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(1170, 40), padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                      side: BorderSide(width: 1, color: Theme.of(context).disabledColor),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: Row(children: [
+                  Expanded(
+                    child: Text(
+                      PriceConverterHelper.convertPrice(baseEarning + tips),
+                      style: robotoBold.copyWith(fontSize: 44, height: 1),
                     ),
                   ),
-                  child: Text('ignore'.tr, textAlign: TextAlign.center, style: robotoRegular.copyWith(
-                    color: Theme.of(context).textTheme.bodyLarge!.color,
-                    fontSize: Dimensions.fontSizeLarge,
-                  )),
-                )),
-                const SizedBox(width: Dimensions.paddingSizeSmall),
+                  if (tips > 0)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: Text('+${PriceConverterHelper.convertPrice(tips)}', style: robotoBold.copyWith(fontSize: 20)),
+                    ),
+                  if (deliveryTime.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(left: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Text('Entregar\naté $deliveryTime', style: robotoRegular.copyWith(fontSize: 14)),
+                    ),
+                ]),
+              ),
+              Container(height: 4, color: Theme.of(context).primaryColor),
+            ]),
+          ),
 
-                Expanded(child: CustomButtonWidget(
-                  height: 40,
-                  radius: Dimensions.radiusDefault,
-                  buttonText: 'accept'.tr,
-                  onPressed: () => Get.dialog(ConfirmationDialogWidget(
-                    icon: Images.warning, title: 'are_you_sure_to_accept'.tr,
-                    description: parcel ? 'you_want_to_accept_this_delivery'.tr : 'you_want_to_accept_this_order'.tr,
-                    onYesPressed: () {
-                      orderController.acceptOrder(orderModel.id, index, orderModel).then((isSuccess) {
-                        if(isSuccess) {
-                          onTap();
-                          orderModel.orderStatus = (orderModel.orderStatus == 'pending' || orderModel.orderStatus == 'confirmed')
-                              ? 'accepted' : orderModel.orderStatus;
-                          Get.toNamed(
-                            RouteHelper.getOrderDetailsRoute(orderModel.id),
-                            arguments: OrderDetailsScreen(
-                              orderId: orderModel.id, isRunningOrder: true, orderIndex: orderController.currentOrderList!.length-1, fromLocationScreen: true,
-                            ),
-                          );
-                        }else {
-                          Get.find<OrderController>().getLatestOrders();
-                        }
-                      });
-                    },
-                  ), barrierDismissible: false),
-                )),
-              ]),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Row(children: [
+              const Icon(Icons.route_rounded, size: 24),
+              const SizedBox(width: 8),
+              Text('Distância total ', style: robotoRegular.copyWith(fontSize: 22)),
+              Text('${totalDistance.toStringAsFixed(1)} km', style: robotoBold.copyWith(fontSize: 22)),
+            ]),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(children: [
+              _AddressLine(color: Colors.amber.shade700, text: sourceAddress),
+              const SizedBox(height: 6),
+              _AddressLine(color: Colors.deepOrangeAccent, text: destinationAddress),
+            ]),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: CustomButtonWidget(
+              height: 62,
+              radius: 20,
+              color: Theme.of(context).primaryColor,
+              buttonText: 'accept'.tr,
+              onPressed: () => Get.dialog(ConfirmationDialogWidget(
+                icon: Images.warning,
+                title: 'are_you_sure_to_accept'.tr,
+                description: parcel ? 'you_want_to_accept_this_delivery'.tr : 'you_want_to_accept_this_order'.tr,
+                onYesPressed: () {
+                  orderController.acceptOrder(orderModel.id, index, orderModel).then((isSuccess) {
+                    if (isSuccess) {
+                      onTap();
+                      orderModel.orderStatus = (orderModel.orderStatus == 'pending' || orderModel.orderStatus == 'confirmed') ? 'accepted' : orderModel.orderStatus;
+                      Get.toNamed(
+                        RouteHelper.getOrderDetailsRoute(orderModel.id),
+                        arguments: OrderDetailsScreen(
+                          orderId: orderModel.id,
+                          isRunningOrder: true,
+                          orderIndex: orderController.currentOrderList!.length - 1,
+                          fromLocationScreen: true,
+                        ),
+                      );
+                    } else {
+                      Get.find<OrderController>().getLatestOrders();
+                    }
+                  });
+                },
+              ), barrierDismissible: false),
             ),
+          ),
 
-          ]),
-        ),
-      ]),
+          if (!fromNotification)
+            Align(
+              alignment: Alignment.center,
+              child: TextButton(
+                onPressed: () => Get.dialog(ConfirmationDialogWidget(
+                  icon: Images.warning,
+                  title: 'are_you_sure_to_ignore'.tr,
+                  description: parcel ? 'you_want_to_ignore_this_delivery'.tr : 'you_want_to_ignore_this_order'.tr,
+                  onYesPressed: () {
+                    orderController.ignoreOrder(index);
+                    Get.back();
+                    Get.back();
+                  },
+                ), barrierDismissible: false),
+                child: Text('ignore'.tr, style: robotoRegular.copyWith(color: Theme.of(context).disabledColor)),
+              ),
+            ),
+        ],
+      ),
     );
+  }
+
+  String _deliveryTimeLabel(String? scheduleAt) {
+    if (scheduleAt == null || scheduleAt.isEmpty) {
+      return '';
+    }
+    try {
+      return DateConverterHelper.dateTimeStringToDateTime(scheduleAt).split(' ').last;
+    } catch (_) {
+      return '';
+    }
+  }
+}
+
+class _AddressLine extends StatelessWidget {
+  final Color color;
+  final String text;
+  const _AddressLine({required this.color, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Column(children: [
+        Container(height: 14, width: 14, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(height: 2),
+        Container(height: 16, width: 2, color: Colors.black12),
+      ]),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          text,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: robotoRegular.copyWith(fontSize: 20),
+        ),
+      ),
+    ]);
   }
 }
