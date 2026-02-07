@@ -239,8 +239,8 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
         || Geolocator.distanceBetween(
               _lastDirectionsOrigin!.latitude,
               _lastDirectionsOrigin!.longitude,
-              routeOrigin.latitude,
-              routeOrigin.longitude,
+              routeOrigin!.latitude,
+              routeOrigin!.longitude,
             ) >=
             _directionsMinMoveMeters;
 
