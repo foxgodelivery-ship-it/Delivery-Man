@@ -38,6 +38,12 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
   GoogleMapController? _controller;
   final Set<Marker> _markers = HashSet<Marker>();
   final Set<Polyline> _polylines = HashSet<Polyline>();
+  LatLng? _currentLatLng;
+  DateTime? _lastDirectionsFetchAt;
+  LatLng? _lastDirectionsOrigin;
+  bool _isFetchingDirections = false;
+  final Duration _directionsThrottle = const Duration(seconds: 5);
+  final double _directionsMinMoveMeters = 50.0;
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +105,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
             onTap: widget.onTap,
             index: widget.index,
             fromNotification: widget.fromNotification,
+            currentLatLng: _currentLatLng,
           ),
         ),
 
@@ -257,42 +264,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
 
   LatLngBounds _buildBounds(List<LatLng> points) {
     if (points.isEmpty) {
-      return const LatLngBounds(
-        southwest: LatLng(-90, -180),
-        northeast: LatLng(90, 180),
-      );
-    }
-
-    double minLat = points.first.latitude;
-    double maxLat = points.first.latitude;
-    double minLng = points.first.longitude;
-    double maxLng = points.first.longitude;
-
-    for (final point in points) {
-      minLat = min(minLat, point.latitude);
-      maxLat = max(maxLat, point.latitude);
-      minLng = min(minLng, point.longitude);
-      maxLng = max(maxLng, point.longitude);
-    }
-
-    if (minLat == maxLat) {
-      minLat -= 0.01;
-      maxLat += 0.01;
-    }
-    if (minLng == maxLng) {
-      minLng -= 0.01;
-      maxLng += 0.01;
-    }
-
-    return LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
-    );
-  }
-
-  LatLngBounds _buildBounds(List<LatLng> points) {
-    if (points.isEmpty) {
-      return const LatLngBounds(
+      return LatLngBounds(
         southwest: LatLng(-90, -180),
         northeast: LatLng(90, 180),
       );
