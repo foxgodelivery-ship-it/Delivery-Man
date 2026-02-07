@@ -2,4 +2,5 @@
 
 <resources>
     <color name="background_color">#FFFFFF</color>
+    <color name="fox_blue">#2979FF</color>
 </resources>
