@@ -262,8 +262,13 @@ class OrderController extends GetxController implements GetxService {
     ResponseModel responseModel = await orderServiceInterface.acceptOrder(orderID);
     Get.back();
     if(responseModel.isSuccess) {
-      if(index >= 0 && _latestOrderList != null && index < _latestOrderList!.length) {
-        _latestOrderList!.removeAt(index);
+      if(_latestOrderList != null) {
+        final bool hasValidIndex = index >= 0 && index < _latestOrderList!.length;
+        if(hasValidIndex && _latestOrderList![index].id == orderID) {
+          _latestOrderList!.removeAt(index);
+        } else {
+          _latestOrderList!.removeWhere((order) => order.id == orderID);
+        }
       }
       _currentOrderList ??= [];
       _currentOrderList!.add(orderModel);
