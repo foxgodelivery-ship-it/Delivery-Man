@@ -64,9 +64,13 @@ class SplashScreenState extends State<SplashScreen> {
     _onConnectivityChanged?.cancel();
   }
 
+  int _configRetryCount = 0;
+  static const int _maxConfigRetryAttempts = 3;
+
   void _route() {
     Get.find<SplashController>().getConfigData().then((isSuccess) async {
       if (isSuccess) {
+        _configRetryCount = 0;
         Timer(const Duration(seconds: 1), () async {
           double? minimumVersion = _getMinimumVersion();
           bool isMaintenanceMode = Get.find<SplashController>().configModel!.maintenanceMode!;
@@ -82,8 +86,27 @@ class SplashScreenState extends State<SplashScreen> {
             }
           }
         });
+      } else {
+        _handleConfigFailure();
       }
     });
+  }
+
+  void _handleConfigFailure() {
+    _configRetryCount++;
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      backgroundColor: Colors.red,
+      duration: const Duration(seconds: 3),
+      content: Text('no_connection'.tr, textAlign: TextAlign.center),
+    ));
+
+    if (_configRetryCount < _maxConfigRetryAttempts) {
+      Timer(const Duration(seconds: 2), _route);
+    } else {
+      Get.offNamed(RouteHelper.getSignInRoute());
+    }
   }
 
   double? _getMinimumVersion() {
