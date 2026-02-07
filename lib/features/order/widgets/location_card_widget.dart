@@ -20,6 +20,7 @@ class LocationCardWidget extends StatelessWidget {
   final int index;
   final Function onTap;
   final bool fromNotification;
+  final LatLng? currentLatLng;
   const LocationCardWidget({
     super.key,
     required this.orderModel,
@@ -27,6 +28,7 @@ class LocationCardWidget extends StatelessWidget {
     required this.index,
     required this.onTap,
     this.fromNotification = false,
+    this.currentLatLng,
   });
 
   @override
@@ -136,7 +138,7 @@ class LocationCardWidget extends StatelessWidget {
             child: CustomButtonWidget(
               height: 62,
               radius: 20,
-              color: Theme.of(context).primaryColor,
+              backgroundColor: Theme.of(context).primaryColor,
               buttonText: 'accept'.tr,
               onPressed: () => Get.dialog(ConfirmationDialogWidget(
                 icon: Images.warning,
