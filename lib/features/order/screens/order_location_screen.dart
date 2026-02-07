@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 import 'dart:ui';
@@ -5,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
@@ -128,8 +130,8 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
         double storeLng = double.parse(orderModel.storeLng ?? '0');
         double receiverLat = double.parse(orderModel.receiverDetails?.latitude ?? '0');
         double receiverLng = double.parse(orderModel.receiverDetails?.longitude ?? '0');
-        double deliveryManLat = Get.find<ProfileController>().recordLocationBody?.latitude ?? 0;
-        double deliveryManLng = Get.find<ProfileController>().recordLocationBody?.longitude ?? 0;
+        double deliveryManLat = _currentLatLng?.latitude ?? Get.find<ProfileController>().recordLocationBody?.latitude ?? 0;
+        double deliveryManLng = _currentLatLng?.longitude ?? Get.find<ProfileController>().recordLocationBody?.longitude ?? 0;
 
         final List<LatLng> routePoints = [];
         if (deliveryManLat != 0 || deliveryManLng != 0) {

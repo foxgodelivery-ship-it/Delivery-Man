@@ -34,6 +34,7 @@ class LocationCardWidget extends StatelessWidget {
     bool parcel = orderModel.orderType == 'parcel';
     double restaurantDistance = Get.find<AddressController>().getRestaurantDistance(
       LatLng(double.parse(parcel ? orderModel.deliveryAddress?.latitude ?? '0' : orderModel.storeLat ?? '0'), double.parse(parcel ? orderModel.deliveryAddress?.longitude ?? '0' : orderModel.storeLng ?? '0')),
+      customerLatLng: currentLatLng,
     );
     double restaurantToCustomerDistance = Get.find<AddressController>().getRestaurantDistance(
       LatLng(double.parse(parcel ? orderModel.deliveryAddress?.latitude ?? '0' : orderModel.storeLat ?? '0'), double.parse(parcel ? orderModel.deliveryAddress?.longitude ?? '0' : orderModel.storeLng ?? '0')),
