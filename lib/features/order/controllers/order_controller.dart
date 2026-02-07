@@ -262,7 +262,10 @@ class OrderController extends GetxController implements GetxService {
     ResponseModel responseModel = await orderServiceInterface.acceptOrder(orderID);
     Get.back();
     if(responseModel.isSuccess) {
-      _latestOrderList!.removeAt(index);
+      if(index >= 0 && _latestOrderList != null && index < _latestOrderList!.length) {
+        _latestOrderList!.removeAt(index);
+      }
+      _currentOrderList ??= [];
       _currentOrderList!.add(orderModel);
     }else {
       showCustomSnackBar(responseModel.message, isError: true);
