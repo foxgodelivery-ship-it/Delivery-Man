@@ -61,6 +61,8 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
   void dispose() {
     _timer?.cancel();
     _countdownTimer?.cancel();
+    unawaited(Get.find<OrderController>().stopNotificationSound());
+    unawaited(stopService());
     super.dispose();
   }
 
@@ -80,7 +82,14 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
           _seconds--;
         });
       } else {
+        _countdownTimer?.cancel();
+        _timer?.cancel();
+        unawaited(Get.find<OrderController>().stopNotificationSound());
+        unawaited(stopService());
         timer.cancel();
+        if(Get.currentRoute == '/OrderLocationScreen') {
+          Get.back();
+        }
       }
     });
   }
