@@ -18,11 +18,14 @@ import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_app_bar_widget.dart';
+import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_image_widget.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/order_item_widget.dart';
+import 'package:sixam_mart_delivery/features/order/widgets/verify_delivery_sheet_widget.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/info_card_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final int? orderId;
@@ -95,13 +98,20 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
         }
       },
       child: Scaffold(
-        backgroundColor: Theme.of(context).cardColor,
+        backgroundColor: const Color(0xFFF4F5F7),
         appBar: CustomAppBarWidget(title: 'order_details'.tr, onBackPressed: (){
         if(widget.fromNotification || widget.fromLocationScreen) {
             Get.offAllNamed(RouteHelper.getInitialRoute());
           } else {
             Get.back();
           }
+        }),
+        floatingActionButton: GetBuilder<OrderController>(builder: (orderController) {
+          final order = orderController.orderModel;
+          if(order == null) {
+            return const SizedBox();
+          }
+          return _buildNavigateButton(order);
         }),
         body: SafeArea(
           child: GetBuilder<OrderController>(builder: (orderController) {
@@ -197,6 +207,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                     ),
                   ]),
                   const SizedBox(height: Dimensions.paddingSizeLarge),
+
+                  _buildFoxStatusCard(context, controllerOrderModel, orderController.orderDetailsModel ?? []),
+                  const SizedBox(height: Dimensions.paddingSizeDefault),
 
                   parcel && order?.orderStatus == AppConstants.canceled && !(order?.parcelCancellation?.beforePickup == 1) ? Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                     Text('return_date_and_time'.tr, style: robotoRegular),
@@ -720,13 +733,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                 ]),
               )),
 
-              parcel ? ParcelBottomView(
-                orderController: orderController, controllerOrderModel: controllerOrderModel, orderId: widget.orderId!,
-                fromLocationScreen: widget.fromLocationScreen, showDeliveryConfirmImage: showDeliveryConfirmImage,
-              ) : RegularOrderBottomView(
-                orderController: orderController, controllerOrderModel: controllerOrderModel, fromLocationScreen: widget.fromLocationScreen,
-                orderId: widget.orderId!, showDeliveryConfirmImage: showDeliveryConfirmImage,
-              ),
+              _buildBottomActionByStatus(orderController, controllerOrderModel, showDeliveryConfirmImage, parcel ?? false),
 
             ]) : const Center(child: CircularProgressIndicator());
           }),
@@ -734,6 +741,152 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       ),
     );
   }
+
+  Widget _buildNavigateButton(OrderModel order) {
+    final String? status = order.orderStatus;
+    bool shouldShow = status == AppConstants.accepted || status == AppConstants.pickedUp;
+    if(!shouldShow) {
+      return const SizedBox();
+    }
+
+    final bool toCustomer = status == AppConstants.pickedUp;
+    final String? latitude = toCustomer ? order.deliveryAddress?.latitude : order.storeLat;
+    final String? longitude = toCustomer ? order.deliveryAddress?.longitude : order.storeLng;
+
+    if(latitude == null || longitude == null) {
+      return const SizedBox();
+    }
+
+    return FloatingActionButton.extended(
+      backgroundColor: Theme.of(context).primaryColor,
+      onPressed: () => _openNavigation(latitude, longitude),
+      icon: const Icon(Icons.navigation_outlined, color: Colors.white),
+      label: const Text('Navegar', style: TextStyle(color: Colors.white)),
+    );
+  }
+
+  Future<void> _openNavigation(String latitude, String longitude) async {
+    final googleUrl = 'https://www.google.com/maps/dir/?api=1&destination=$latitude,$longitude&travelmode=driving';
+    final wazeUrl = 'https://waze.com/ul?ll=$latitude,$longitude&navigate=yes';
+
+    if(await canLaunchUrlString(googleUrl)) {
+      await launchUrlString(googleUrl, mode: LaunchMode.externalApplication);
+    } else if(await canLaunchUrlString(wazeUrl)) {
+      await launchUrlString(wazeUrl, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _buildFoxStatusCard(BuildContext context, OrderModel order, List<OrderDetailsModel> orderDetails) {
+    final status = order.orderStatus;
+    String title = 'Status da rota';
+    String subtitle = '';
+
+    switch(status) {
+      case AppConstants.accepted:
+        title = 'Indo à Loja';
+        subtitle = order.storeAddress ?? '';
+        break;
+      case 'arrived':
+        title = 'Na Loja';
+        subtitle = '${orderDetails.length} item(ns) para conferência';
+        break;
+      case AppConstants.pickedUp:
+        title = 'Indo ao Cliente';
+        subtitle = order.deliveryAddress?.address ?? '';
+        break;
+      case AppConstants.handover:
+        title = 'Prova de Entrega';
+        subtitle = 'Finalize com código e/ou foto';
+        break;
+      default:
+        return const SizedBox();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge)),
+        if(subtitle.isNotEmpty) ...[
+          const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+          Text(subtitle, style: robotoRegular),
+        ],
+      ]),
+    );
+  }
+
+  Widget _buildBottomActionByStatus(OrderController orderController, OrderModel order, bool showDeliveryConfirmImage, bool parcel) {
+    if(parcel) {
+      return ParcelBottomView(
+        orderController: orderController,
+        controllerOrderModel: order,
+        orderId: widget.orderId!,
+        fromLocationScreen: widget.fromLocationScreen,
+        showDeliveryConfirmImage: showDeliveryConfirmImage,
+      );
+    }
+
+    switch(order.orderStatus) {
+      case AppConstants.accepted:
+        return _foxBottomButton('Cheguei na Loja', () => orderController.updateOrderStatus(order, 'arrived'));
+      case 'arrived':
+        return _foxBottomButton('Confirmar Retirada', () => orderController.updateOrderStatus(order, AppConstants.pickedUp));
+      case AppConstants.pickedUp:
+        return _foxBottomButton('Cheguei no Cliente', () => orderController.updateOrderStatus(order, AppConstants.handover));
+      case AppConstants.handover:
+        return _foxBottomButton('Finalizar Entrega', () {
+          final bool verifyCode = Get.find<SplashController>().configModel?.orderDeliveryVerification ?? false;
+          final bool verifyPhoto = Get.find<SplashController>().configModel?.dmPictureUploadStatus ?? false;
+          if(verifyCode || verifyPhoto) {
+            Get.bottomSheet(
+              VerifyDeliverySheetWidget(
+                currentOrderModel: order,
+                verify: verifyCode,
+                orderAmount: order.orderAmount,
+                cod: order.paymentMethod == 'cash_on_delivery',
+              ),
+              isScrollControlled: true,
+            );
+          } else {
+            orderController.updateOrderStatus(order, AppConstants.delivered);
+          }
+        });
+      default:
+        return RegularOrderBottomView(
+          orderController: orderController,
+          controllerOrderModel: order,
+          fromLocationScreen: widget.fromLocationScreen,
+          orderId: widget.orderId!,
+          showDeliveryConfirmImage: showDeliveryConfirmImage,
+        );
+    }
+  }
+
+  Widget _foxBottomButton(String title, VoidCallback onPressed) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+      decoration: const BoxDecoration(color: Colors.white),
+      child: CustomButtonWidget(
+        buttonText: title,
+        onPressed: onPressed,
+        radius: 14,
+        backgroundColor: Theme.of(context).primaryColor,
+      ),
+    );
+  }
+
 
   void openDialog(BuildContext context, String imageUrl) => showDialog(
     context: context,

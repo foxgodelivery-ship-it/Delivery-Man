@@ -88,9 +88,9 @@ class OrderRepository implements OrderRepositoryInterface {
 
     Response response = await apiClient.postMultipartData(AppConstants.updateOrderStatusUri, data, proofAttachment, handleError: false);
     if (response.statusCode == 200) {
-      responseModel = ResponseModel(true, response.body['message']);
+      responseModel = ResponseModel(true, response.body['message'], statusCode: response.statusCode);
     }else {
-      responseModel = ResponseModel(false, response.statusText);
+      responseModel = ResponseModel(false, response.statusText, statusCode: response.statusCode);
     }
     return responseModel;
   }
@@ -121,9 +121,9 @@ class OrderRepository implements OrderRepositoryInterface {
         },
         handleError: false);
     if (response.statusCode == 200) {
-      responseModel = ResponseModel(true, response.body['message']);
+      responseModel = ResponseModel(true, response.body['message'], statusCode: response.statusCode);
     }else {
-      responseModel = ResponseModel(false, response.statusText);
+      responseModel = ResponseModel(false, response.statusText, statusCode: response.statusCode);
     }
     return responseModel;
   }
