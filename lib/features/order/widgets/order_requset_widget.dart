@@ -121,8 +121,8 @@ class OrderRequestWidget extends StatelessWidget {
               child: CustomButtonWidget(
                 height: 48,
                 radius: 24,
-                buttonColor: Theme.of(context).primaryColor,
-                textColor: Colors.white,
+                backgroundColor: Theme.of(context).primaryColor,
+                fontColor: Colors.white,
                 buttonText: 'Aceitar Corrida',
                 fontSize: Dimensions.fontSizeLarge,
                 onPressed: () => Get.dialog(
