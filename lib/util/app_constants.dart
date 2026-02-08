@@ -92,6 +92,7 @@ class AppConstants {
   static const String notificationIdList = 'notification_id_list';
   static const String homeDailyGoalValue = 'home_daily_goal_value';
   static const String onlineStartTime = 'online_start_time';
+  static const String activeAcceptedOrderId = 'active_accepted_order_id';
 
   /// Status
   static const String pending = 'pending';

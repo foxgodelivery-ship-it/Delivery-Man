@@ -17,6 +17,7 @@ import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sixam_mart_delivery/features/order/domain/services/order_service_interface.dart';
 
 class OrderController extends GetxController implements GetxService {
@@ -201,6 +202,10 @@ class OrderController extends GetxController implements GetxService {
     if(latestOrderList != null) {
       _latestOrderList = [];
       List<int?> ignoredIdList = orderServiceInterface.prepareIgnoreIdList(_ignoredRequests);
+      int? activeOrderId = Get.find<SharedPreferences>().getInt(AppConstants.activeAcceptedOrderId);
+      if(activeOrderId != null && activeOrderId > 0) {
+        latestOrderList = latestOrderList.where((order) => order.id == activeOrderId).toList();
+      }
       _latestOrderList!.addAll(orderServiceInterface.processLatestOrders(latestOrderList, ignoredIdList));
     }
     update();
@@ -229,6 +234,9 @@ class OrderController extends GetxController implements GetxService {
         Get.find<ProfileController>().getProfile();
         getCurrentOrders();
         currentOrder.orderStatus = status;
+        if(status == AppConstants.delivered || status == AppConstants.failed || status == AppConstants.canceled || status == AppConstants.refunded || status == AppConstants.returned) {
+          Get.find<SharedPreferences>().remove(AppConstants.activeAcceptedOrderId);
+        }
       }
       showCustomSnackBar(responseModel.message, isError: false, getXSnackBar: false);
     }else {
@@ -265,10 +273,18 @@ class OrderController extends GetxController implements GetxService {
     ResponseModel responseModel = await orderServiceInterface.acceptOrder(orderID);
     Get.back();
     if(responseModel.isSuccess) {
-      _latestOrderList!.removeAt(index);
+      if(_latestOrderList != null && index < _latestOrderList!.length) {
+        _latestOrderList!.removeAt(index);
+      }
+      _currentOrderList ??= [];
       _currentOrderList!.add(orderModel);
+      Get.find<SharedPreferences>().setInt(AppConstants.activeAcceptedOrderId, orderID ?? orderModel.id ?? 0);
     }else {
-      showCustomSnackBar(responseModel.message, isError: true);
+      if(responseModel.statusCode == 403) {
+        showCustomSnackBar(responseModel.message ?? 'Pedido já aceito por outro entregador', isError: true);
+      } else {
+        showCustomSnackBar(responseModel.message, isError: true);
+      }
     }
     _isLoading = false;
     update();
