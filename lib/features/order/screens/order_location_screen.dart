@@ -36,7 +36,7 @@ class OrderLocationScreen extends StatefulWidget {
 }
 
 class _OrderLocationScreenState extends State<OrderLocationScreen> {
-  static const int totalConfigSeconds = 60;
+  static const int totalConfigSeconds = 40;
   GoogleMapController? _controller;
   final Set<Marker> _markers = HashSet<Marker>();
   final Set<Polyline> _polylines = HashSet<Polyline>();
@@ -54,6 +54,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
   @override
   void initState() {
     super.initState();
+    _seconds = 35;
     _startAlarm();
   }
 
@@ -68,7 +69,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
 
   void _startAlarm() {
     Get.find<OrderController>().playNotificationSound();
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
       Get.find<OrderController>().playNotificationSound();
     });
 
