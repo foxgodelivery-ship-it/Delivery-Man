@@ -42,7 +42,7 @@ class OrderRequestScreenState extends State<OrderRequestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
+      backgroundColor: const Color(0xFFF3F4F7),
       appBar: CustomAppBarWidget(title: 'order_request'.tr, isBackButtonExist: false),
 
       body: GetBuilder<OrderController>(builder: (orderController) {
