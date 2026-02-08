@@ -90,6 +90,8 @@ class AppConstants {
   static const String localizationKey = 'X-localization';
   static const String langIntro = 'language_intro';
   static const String notificationIdList = 'notification_id_list';
+  static const String homeDailyGoalValue = 'home_daily_goal_value';
+  static const String onlineStartTime = 'online_start_time';
 
   /// Status
   static const String pending = 'pending';
